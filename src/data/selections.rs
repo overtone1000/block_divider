@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-use super::week::Week;
+use super::bucket::BucketDef;
 
 #[derive(Deserialize, Serialize)]
 pub struct Selection {
-    week: Week,
+    week: BucketDef,
     ancillaries: Vec<String>, //this is where Black Butte will go but opens it to other possibilities
 }
 
