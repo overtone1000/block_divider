@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
 use super::participant::Participant;
 
-pub type Designations = HashMap<u64, Vec<Participant>>; //Map containing predesignations in index 0 and each selection round index after that
-pub type Ranks = HashMap<u64, HashMap<Participant, u64>>;
+pub type Designations = BTreeMap<u64, Vec<Participant>>; //Map containing predesignations in index 0 and each selection round index after that
+pub type Ranks = BTreeMap<u64, BTreeMap<Participant, u64>>;
 
 #[derive(Clone, Deserialize, Serialize, Hash, PartialEq, Eq, Debug)]
 pub struct BucketDef {

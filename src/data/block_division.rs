@@ -1,7 +1,7 @@
 use rand::prelude::*;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet},
     error::Error,
     f32::consts::E,
     hash::{Hash, Hasher},
@@ -19,23 +19,23 @@ use super::{
 #[derive(Deserialize, Serialize)]
 pub struct BlockDivisionInput {
     round: u64,
-    selections: HashMap<Participant, Selections>,
+    selections: BTreeMap<Participant, Selections>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct BlockDivisionState {
     participants: Vec<Participant>,
     selection_rounds: u64,
-    buckets: HashMap<String, Bucket>,
+    buckets: BTreeMap<String, Bucket>,
 }
 
-pub type RankFileContents = HashMap<String, Ranks>;
+pub type RankFileContents = BTreeMap<String, Bucket>;
 
-const RANK_CACHE_PATH: &str = "./rank_cache/";
+const STATE_CACHE_PATH: &str = "./state_cache/";
 
 impl BlockDivisionState {
     pub fn build(
-        bucket_definitions: HashMap<String, BucketDef>,
+        bucket_definitions: BTreeMap<String, BucketDef>,
         participants: Vec<Participant>,
         selection_rounds: u64,
     ) -> Result<BlockDivisionState, Box<dyn Error>> {
@@ -49,56 +49,44 @@ impl BlockDivisionState {
         }
         selection_rounds.hash(&mut hasher);
         let hash = hasher.finish();
-        let filename = RANK_CACHE_PATH.to_string() + &hash.to_string();
+        let filename = STATE_CACHE_PATH.to_string() + &hash.to_string();
 
         let mut retval = BlockDivisionState {
             participants: participants,
             selection_rounds: selection_rounds,
-            buckets: HashMap::new(),
+            buckets: BTreeMap::new(),
         };
-        for (bucket_name, bucket_definition) in bucket_definitions {
-            retval.buckets.insert(
-                bucket_name,
-                Bucket {
-                    definition: bucket_definition,
-                    state: BucketState::default(),
-                },
-            );
-        }
 
         if std::path::Path::is_file(std::path::Path::new(&filename)) {
             println!("Loading cached ranks.");
             match std::fs::File::open(&filename) {
                 Ok(file) => {
-                    let bucket_ranks: RankFileContents =
-                        serde_json::from_reader(BufReader::new(file))
-                            .expect("Couldn't deserialize file.");
-                    for (bucket_name, ranks) in bucket_ranks {
-                        match retval.buckets.get_mut(&bucket_name) {
-                            Some(bucket) => {
-                                bucket.state.ranks = ranks;
-                            }
-                            None => {
-                                panic!("Malformed ranks!");
-                            }
-                        }
-                    }
+                    retval.buckets = serde_json::from_reader(BufReader::new(file))
+                        .expect("Couldn't deserialize file.");
                 }
                 Err(e) => {
                     panic!("Coudln't open cache file! {:?}", e)
                 }
             };
         } else {
+            //Input bucket definitions
+            for (bucket_name, bucket_definition) in bucket_definitions {
+                retval.buckets.insert(
+                    bucket_name,
+                    Bucket {
+                        definition: bucket_definition,
+                        state: BucketState::default(),
+                    },
+                );
+            }
+
             println!("Generating ranks.");
             retval.generate_ranks();
-            let mut ranks: RankFileContents = HashMap::new();
-            for (bucket_name, bucket) in &retval.buckets {
-                ranks.insert(bucket_name.to_string(), bucket.state.ranks.clone());
-            }
-            std::fs::create_dir_all(RANK_CACHE_PATH).expect("Should be able to make path.");
+
+            std::fs::create_dir_all(STATE_CACHE_PATH).expect("Should be able to make path.");
             match std::fs::File::create_new(&filename) {
                 Ok(file) => {
-                    serde_json::to_writer(BufWriter::new(file), &ranks)
+                    serde_json::to_writer(BufWriter::new(file), &retval.buckets)
                         .expect("Error writing hash file!");
                 }
                 Err(e) => {
@@ -112,7 +100,7 @@ impl BlockDivisionState {
 
     fn generate_ranks(&mut self) {
         let participant_count = self.participants.len() as u64;
-        let mut initial_available_ranks: HashSet<u64> = HashSet::new();
+        let mut initial_available_ranks: BTreeSet<u64> = BTreeSet::new();
 
         for n in 0..participant_count {
             initial_available_ranks.insert(n);
@@ -124,7 +112,7 @@ impl BlockDivisionState {
         for round in 0..self.selection_rounds {
             println!("Round {}", round);
             for (bucket_name, bucket) in &mut self.buckets {
-                let mut bucket_state_this_round: HashMap<Participant, u64> = HashMap::new();
+                let mut bucket_state_this_round: BTreeMap<Participant, u64> = BTreeMap::new();
 
                 for participant in &self.participants {
                     println!("");
@@ -137,7 +125,7 @@ impl BlockDivisionState {
                         "Ranks already used for this bucket and round are {:?}",
                         (&bucket_state_this_round).values()
                     );
-                    let mut available_ranks: HashSet<u64> = HashSet::new();
+                    let mut available_ranks: BTreeSet<u64> = BTreeSet::new();
                     for r in initial_available_ranks.iter() {
                         available_ranks.insert(r.clone());
                     }
@@ -179,7 +167,7 @@ mod tests {
 
     #[test]
     fn block_division_state_building() {
-        let mut buckets: HashMap<String, BucketDef> = HashMap::new();
+        let mut buckets: BTreeMap<String, BucketDef> = BTreeMap::new();
 
         for n in 0..4 {
             buckets.insert(
