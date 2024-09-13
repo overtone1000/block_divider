@@ -1,6 +1,7 @@
 use rand::prelude::*;
 
 use std::{
+    borrow::BorrowMut,
     collections::{BTreeMap, BTreeSet},
     error::Error,
     f32::consts::E,
@@ -13,38 +14,39 @@ use serde::{Deserialize, Serialize};
 use super::{
     bucket::{self, Bucket, BucketDef, BucketState, Ranks},
     participant::Participant,
-    selections::Selections,
+    selections::Selection,
 };
 
-#[derive(Deserialize, Serialize)]
-pub struct BlockDivisionInput {
-    round: u64,
-    selections: BTreeMap<Participant, Selections>,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 pub struct BlockDivisionState {
     participants: Vec<Participant>,
     selection_rounds: u64,
     buckets: BTreeMap<String, Bucket>,
+    selections: BTreeMap<u64, BTreeMap<Participant, Option<Selection>>>,
 }
 
-pub type RankFileContents = BTreeMap<String, Bucket>;
+#[derive(Deserialize, Serialize)]
+pub struct BlockDivisionInput {
+    round: u64,
+    participant: Participant,
+    selection: Selection,
+}
 
 const STATE_CACHE_PATH: &str = "./state_cache/";
 
 impl BlockDivisionState {
-    pub fn build(
-        bucket_definitions: BTreeMap<String, BucketDef>,
-        participants: Vec<Participant>,
+    pub fn create(
+        bucket_definitions: &BTreeMap<String, BucketDef>,
+        participants: &Vec<Participant>,
         selection_rounds: u64,
+        use_cache_if_available: bool,
     ) -> Result<BlockDivisionState, Box<dyn Error>> {
         //Compute the filename
         let mut hasher = std::hash::DefaultHasher::new();
-        for bucket in &bucket_definitions {
+        for bucket in bucket_definitions {
             bucket.hash(&mut hasher);
         }
-        for participant in &participants {
+        for participant in participants {
             participant.hash(&mut hasher);
         }
         selection_rounds.hash(&mut hasher);
@@ -52,12 +54,15 @@ impl BlockDivisionState {
         let filename = STATE_CACHE_PATH.to_string() + &hash.to_string();
 
         let mut retval = BlockDivisionState {
-            participants: participants,
+            participants: participants.clone(),
             selection_rounds: selection_rounds,
             buckets: BTreeMap::new(),
+            selections: BTreeMap::new(),
         };
 
-        if std::path::Path::is_file(std::path::Path::new(&filename)) {
+        let file_exists = std::path::Path::is_file(std::path::Path::new(&filename));
+
+        if use_cache_if_available && file_exists {
             println!("Loading cached ranks.");
             match std::fs::File::open(&filename) {
                 Ok(file) => {
@@ -71,21 +76,23 @@ impl BlockDivisionState {
         } else {
             //Input bucket definitions
             for (bucket_name, bucket_definition) in bucket_definitions {
-                retval.buckets.insert(
-                    bucket_name,
-                    Bucket {
-                        definition: bucket_definition,
-                        state: BucketState::default(),
-                    },
-                );
+                let mut new_bucket = Bucket {
+                    definition: bucket_definition.clone(),
+                    state: BTreeMap::new(),
+                };
+                for n in 0..selection_rounds {
+                    new_bucket.state.insert(n, BucketState::default());
+                }
+                retval.buckets.insert(bucket_name.to_string(), new_bucket);
             }
 
             println!("Generating ranks.");
             retval.generate_ranks();
 
             std::fs::create_dir_all(STATE_CACHE_PATH).expect("Should be able to make path.");
-            match std::fs::File::create_new(&filename) {
+            match std::fs::File::create(&filename) {
                 Ok(file) => {
+                    file.set_len(0).expect("Couldn't clear file.");
                     serde_json::to_writer(BufWriter::new(file), &retval.buckets)
                         .expect("Error writing hash file!");
                 }
@@ -96,6 +103,24 @@ impl BlockDivisionState {
         }
 
         Ok(retval)
+    }
+
+    pub fn input_selection(
+        &mut self,
+        participant: Participant,
+        selection: Option<Selection>,
+        round: u64,
+    ) {
+        let round_selections = match self.selections.entry(round) {
+            std::collections::btree_map::Entry::Vacant(entry) => entry.insert(BTreeMap::new()),
+            std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
+        };
+        round_selections.insert(participant, selection);
+        self.calculate();
+    }
+
+    fn calculate(&mut self) {
+        todo!("Need to do this!");
     }
 
     fn generate_ranks(&mut self) {
@@ -155,7 +180,8 @@ impl BlockDivisionState {
                     println!("");
                 }
 
-                bucket.state.ranks.insert(round, bucket_state_this_round);
+                bucket.state.get_mut(&round).expect("Should exist.").ranks =
+                    bucket_state_this_round;
             }
         }
     }
@@ -166,7 +192,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn block_division_state_building() {
+    fn block_division_cache_and_serialization_testing() {
         let mut buckets: BTreeMap<String, BucketDef> = BTreeMap::new();
 
         for n in 0..4 {
@@ -174,7 +200,7 @@ mod tests {
                 "Bucket ".to_string() + &n.to_string(),
                 BucketDef {
                     available_slots: 5,
-                    available_ancillaries: ["Black Butte".to_string()].to_vec(),
+                    available_ancillaries: BTreeSet::from(["Black Butte".to_string()]),
                 },
             );
         }
@@ -188,7 +214,9 @@ mod tests {
 
         let selection_rounds = 3;
 
-        let bds = BlockDivisionState::build(buckets, participants, selection_rounds)
+        BlockDivisionState::create(&buckets, &participants, selection_rounds, false) //create to test overwriting
+            .expect("Should work.");
+        let bds = BlockDivisionState::create(&buckets, &participants, selection_rounds, false) //recreate to test ignoring
             .expect("Should work.");
 
         println!("----------------------");
@@ -203,5 +231,14 @@ mod tests {
         println!("{}", serialized);
         println!("----------------------");
         println!("");
+
+        let bds2 = BlockDivisionState::create(&buckets, &participants, selection_rounds, true) //recreate to test equivalence
+            .expect("Should work.");
+
+        assert!(bds == bds2); //bds created from cache must be equal to the one that created the cache
+        assert!(
+            serde_json::to_string(&bds).expect("Should serialize.")
+                == serde_json::to_string(&bds2).expect("Should serialize.")
+        ); //serializations should also be equal.
     }
 }
