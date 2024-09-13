@@ -120,7 +120,21 @@ impl BlockDivisionState {
     }
 
     fn calculate(&mut self) {
-        todo!("Need to do this!");
+        for round in 0..self.selection_rounds {
+            let selections = self.selections.get(&round).expect("Should exist.");
+            for (participant, selection) in selections {
+                match selection {
+                    Some(selection) => {
+                        let bucket = self
+                            .buckets
+                            .get_mut(&selection.bucket_name)
+                            .expect("Should exist.");
+                        bucket.attempt_selection(&round, participant, selection);
+                    }
+                    None => {}
+                }
+            }
+        }
     }
 
     fn generate_ranks(&mut self) {
