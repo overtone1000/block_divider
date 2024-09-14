@@ -7,16 +7,19 @@ use super::{participant::Participant, selections::Selection};
 pub type Designations = BTreeSet<Participant>; //Map containing selected participants. Keys are rounds of the selection.
 pub type Ranks = BTreeMap<Participant, u64>;
 
+pub type BucketName = String;
+pub type AncillaryName = String;
+
 #[derive(Clone, Deserialize, Serialize, Hash, PartialEq, Eq, Debug)]
 pub struct BucketDef {
     pub(crate) available_slots: u64, //How many participants can fit in this bucket in total
-    pub(crate) available_ancillaries: BTreeSet<String>, //What ancillaries are available to an individual participant in this bucket
+    pub(crate) available_ancillaries: BTreeSet<AncillaryName>, //What ancillaries are available to an individual participant in this bucket
 }
 
 #[derive(Deserialize, Serialize, Debug, Default, PartialEq, Eq)]
 pub struct BucketState {
     pub(crate) designations: Designations, //Who is in this bucket in each round (0 is predesignation, 1 is round 1, 2 is round 2, etc.)
-    pub(crate) ancillary_designations: BTreeMap<String, Participant>,
+    pub(crate) ancillary_designations: BTreeMap<BucketName, Participant>,
     pub(crate) ranks: Ranks, //Map containing the ranks for each participant for each potential round
 }
 

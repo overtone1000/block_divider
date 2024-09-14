@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::bucket::BucketDef;
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Selection {
     pub(crate) bucket_name: String,
     pub(crate) ancillaries: BTreeSet<String>, //this is where Black Butte will go but opens it to other possibilities
