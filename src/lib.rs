@@ -3,6 +3,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use server::{commons::spawn_server, handler::PostHandler};
 
 pub mod data;
+pub mod mail;
 pub mod server;
 
 const PORT: u16 = 80;
