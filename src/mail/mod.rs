@@ -1,39 +1,49 @@
 use std::io::BufReader;
 
 use lettre::{
-    message::Mailbox, transport::smtp::authentication::Credentials, Message, SmtpTransport, Transport
+    message::Mailbox,
+    transport::smtp::{
+        authentication::{Credentials, Mechanism},
+        client::TlsParametersBuilder,
+    },
+    Message, SmtpTransport, Transport,
 };
 use serde::Deserialize;
 
 #[derive(Deserialize)]
-pub struct MailService
-{
-    from_address:String,
-    smtp_url:String,
-    smtp_port:u16,
-    user:String,
-    password:String
+pub struct MailService {
+    from_address: String,
+    smtp_url: String,
+    smtp_port: u16,
+    user: String,
+    password: String,
 }
 
-const MAIL_SERVICE_FILE:&str = "./secrets/email.json";
+const MAIL_SERVICE_FILE: &str = "./secrets/email.json";
 
-pub fn get_service()->Result<MailService,Box::<dyn std::error::Error>>
-{
+pub fn get_service() -> Result<MailService, Box<dyn std::error::Error>> {
     let file = std::fs::File::open(MAIL_SERVICE_FILE)?;
     let service = serde_json::from_reader(BufReader::new(file))?;
     Ok(service)
 }
 
-fn get_transport(service: &MailService)->Result<SmtpTransport,Box::<dyn std::error::Error>>
-{
-    // Create TLS transport on port 465
+fn get_transport(service: &MailService) -> Result<SmtpTransport, Box<dyn std::error::Error>> {
+    let tls_parameters = TlsParametersBuilder::new(service.smtp_url.to_string())
+        .set_min_tls_version(lettre::transport::smtp::client::TlsVersion::Tlsv12)
+        .build()
+        .expect("Should be able to build parameters.");
+
+    // Create TLS transport on port 587
     let sender = SmtpTransport::relay(&service.smtp_url)?
-    .port(service.smtp_port)
-    .credentials(Credentials::new(
-        service.user.to_string(),
-        service.password.to_string(),
-    ))
-    .build();
+        .port(service.smtp_port)
+        .credentials(Credentials::new(
+            service.user.to_string(),
+            service.password.to_string(),
+        ))
+        .tls(lettre::transport::smtp::client::Tls::Required(
+            tls_parameters,
+        ))
+        .build();
 
     Ok(sender)
 }
@@ -44,7 +54,7 @@ pub fn send_mail(
     subject: String,
     body: String,
 ) -> Result<lettre::transport::smtp::response::Response, Box<dyn std::error::Error>> {
-    let sender :Mailbox= service.from_address.parse()?;
+    let sender: Mailbox = service.from_address.parse()?;
 
     let email = Message::builder()
         .from(sender.clone())
@@ -55,7 +65,6 @@ pub fn send_mail(
 
     let sender = get_transport(service)?;
 
-    // Send the email via remote relay
     Ok(sender.send(&email)?)
 }
 
@@ -76,7 +85,8 @@ mod tests {
             &service,
             &service.from_address,
             "Block Divider E-mail Test".to_string(),
-            "This is a test of programmatic e-mailing.".to_string()
-        ).expect("Couldn't send e-mail.");
+            "This is a test of programmatic e-mailing.".to_string(),
+        )
+        .expect("Couldn't send e-mail.");
     }
 }
