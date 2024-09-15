@@ -1,39 +1,53 @@
-use lettre::{
-    transport::smtp::authentication::{Credentials, Mechanism},
-    Message, SmtpTransport,
-};
-use std::env;
+use std::io::BufReader;
 
-const AUTOSCHEDA_BOT: &str = "Autoscheda Bot <bot@autoscheda.com>";
-const ZOHO_SMTP_URL: &str = "smtp.zoho.com";
-const ZOHO_SMTP_PORT: u16 = 465;
-const ZOHO_APP_UNAME: &str = "ZOHO_APP_UNAME";
-const ZOHO_APP_PW: &str = "ZOHO_APP_PW";
+use lettre::{
+    message::Mailbox, transport::smtp::authentication::Credentials, Message, SmtpTransport, Transport
+};
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+pub struct MailService
+{
+    from_address:String,
+    smtp_url:String,
+    smtp_port:u16,
+    user:String,
+    password:String
+}
+
+const MAIL_SERVICE_FILE:&str = "./secrets/email.json";
+
+pub fn get_service()->Result<MailService,Box::<dyn std::error::Error>>
+{
+    let file = std::fs::File::open(MAIL_SERVICE_FILE)?;
+    let service = serde_json::from_reader(BufReader::new(file))?;
+    Ok(service)
+}
 
 pub fn send_mail(
+    service: &MailService,
     recipient: &str,
     subject: String,
     body: String,
-) -> Result<_, Box<dyn std::error::Error>> {
-    let sender = AUTOSCHEDA_BOT.parse()?;
+) -> Result<lettre::transport::smtp::response::Response, Box<dyn std::error::Error>> {
+    let sender :Mailbox= service.from_address.parse()?;
 
     let email = Message::builder()
-        .from(sender)
+        .from(sender.clone())
         .reply_to(sender)
         .to(recipient.parse()?)
         .subject(subject)
         .body(body)?;
 
     // Create TLS transport on port 465
-    let sender = SmtpTransport::relay(ZOHO_SMTP_URL)?
-        .port(ZOHO_SMTP_PORT)
+    let sender = SmtpTransport::relay(&service.smtp_url)?
+        .port(service.smtp_port)
         .credentials(Credentials::new(
-            env::var(ZOHO_APP_UNAME),
-            env::var(ZOHO_APP_PW),
+            service.user.to_string(),
+            service.password.to_string(),
         ))
         .build();
-    // Send the email via remote relay
-    let result = sender.send(&email);
 
-    Ok(result)
+    // Send the email via remote relay
+    Ok(sender.send(&email)?)
 }
