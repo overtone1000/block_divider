@@ -1,0 +1,41 @@
+{
+	"name": "block_divider_frontend",
+	"version": "0.1.0",
+	"private": true,
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"build_and_deploy": "vite build && bash ../deploy/deploy_to_production.sh",
+		"preview": "vite preview",
+		"check": "svelte-check",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"lint": "prettier --plugin-search-dir . --check . && eslint .",
+		"format": "prettier --plugin-search-dir . --write .",
+		"prepare": "npm run smui-theme-light && npm run smui-theme-dark",
+		"smui-theme-light": "smui-theme compile static/smui.css -i src/theme/light",
+		"smui-theme-dark": "smui-theme compile static/smui-dark.css -i src/theme/dark"
+	},
+	"devDependencies": {
+		"@material/typography": "^14.0.0",
+		"@mdi/js": "^7.4.47",
+		"@smui/icon-button": "^7.0.0",
+		"@sveltejs/adapter-static": "^2.0.2",
+		"@sveltejs/kit": "^1.27.4",
+		"@typescript-eslint/eslint-plugin": "^5.45.0",
+		"@typescript-eslint/parser": "^5.45.0",
+		"eslint": "^8.28.0",
+		"eslint-config-prettier": "^8.5.0",
+		"prettier": "^2.8.0",
+		"smui-theme": "^7.0.0",
+		"svelte": "^4.2.7",
+		"svelte-check": "^3.6.0",
+		"svelte-preprocess": "^5.0.0",
+		"tslib": "^2.5.0",
+		"typescript": "^5.0.4",
+		"vite": "^4.4.2"
+	},
+	"type": "module",
+	"dependencies": {
+		"svelte-material-ui": "^7.0.0"
+	}
+}
