@@ -8,7 +8,7 @@ export default defineConfig(
 		};
 
 		if (command === "serve") {
-			process.env.VITE_POST_ROOT = "http://localhost:8080";
+			process.env.VITE_POST_ROOT = "http://localhost:8180";
 		}
 		else if (command === "build") {
 			process.env.VITE_POST_ROOT = "";
