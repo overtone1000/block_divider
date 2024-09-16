@@ -72,6 +72,11 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_secret() {
+        let service = get_service().expect("Couldn't get secret.");
+    }
+
+    #[test]
     fn test_email_connectivity() {
         let service = get_service().expect("Couldn't get service.");
         let sender = get_transport(&service).expect("Couldnt get transport.");
