@@ -12,7 +12,7 @@ pub async fn tokio_serve<'a>() -> Result<(), Box<dyn std::error::Error + Send + 
     println!("Building server");
 
     let handler = PostHandler::new();
-    let server = spawn_server(IpAddr::V4(Ipv4Addr::LOCALHOST), PORT, handler.clone());
+    let server = spawn_server(IpAddr::V4(Ipv4Addr::LOCALHOST), PORT, handler);
 
     tokio::try_join!(server)?;
 

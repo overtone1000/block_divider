@@ -1,25 +1,28 @@
 use std::{future::Future, pin::Pin};
 
-use http_body_util::{combinators::BoxBody, BodyExt, Either, Empty, Full};
+use http_body_util::{combinators::BoxBody, BodyExt, Full};
 use hyper::{
-    body::{Body, Bytes, Frame, Incoming},
+    body::{Bytes, Frame, Incoming},
     service::Service,
     Method, Request, Response,
 };
-use serde::{Deserialize, Serialize};
+use tokio_util::io::ReaderStream;
 
 use crate::data::block_division::BlockDivisionInput;
 
 use futures_util::TryStreamExt;
 
-type HandlerResponse = Response<BoxBody<Bytes, std::io::Error>>;
+type HandlerError = Box<dyn std::error::Error + Send + Sync>;
+type HandlerBody = BoxBody<Bytes, HandlerError>;
+type HandlerResponse = Response<HandlerBody>;
+type HandlerResult = Result<HandlerResponse, HandlerError>;
 
 #[derive(Clone)]
 pub struct PostHandler {}
 
 impl Service<Request<Incoming>> for PostHandler {
     type Response = HandlerResponse;
-    type Error = Box<dyn std::error::Error + Send + Sync>;
+    type Error = HandlerError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn call(&self, request: Request<Incoming>) -> Self::Future {
@@ -33,9 +36,7 @@ impl PostHandler {
         PostHandler {}
     }
 
-    async fn handle_request(
-        request: Request<Incoming>,
-    ) -> Result<HandlerResponse, Box<dyn std::error::Error + Send + Sync>> {
+    async fn handle_request(request: Request<Incoming>) -> HandlerResult {
         let method = request.method().clone();
         let path = request.uri().path();
         let headers = request.headers().clone();
@@ -52,35 +53,34 @@ impl PostHandler {
         }
     }
 
-    fn not_found() -> Response<Full<Bytes>> {
+    fn not_found() -> HandlerResponse {
         Response::builder()
             .status(hyper::StatusCode::NOT_FOUND)
-            .body(Full::new(Bytes::from("Resource not found.")))
+            .body(Self::full_to_boxed_body("Resource not found."))
             .expect("Should produce response.")
     }
 
-    fn bad_request() -> Response<Full<Bytes>> {
+    fn bad_request() -> HandlerResponse {
         Response::builder()
             .status(hyper::StatusCode::BAD_REQUEST)
-            .body(Full::new(Bytes::from("Malformed request.")))
+            .body(Self::full_to_boxed_body("Malformed request."))
             .expect("Should produce response.")
     }
 
-    async fn send_file(
-        path: String,
-    ) -> Result<HandlerResponse, Box<dyn std::error::Error + Send + Sync>> {
+    async fn send_file(path: String) -> HandlerResult {
         if path.contains("..") {
             //Reject attempts to access parent directories
             return Ok(Self::bad_request());
         } else {
+            let path = ".".to_string() + path.as_str(); //need to prepend to get to this file system.
+            eprintln!("Need to point this at a safe directory to avoid inappropriately exposing files in the working directory.");
+
+            println!("Trying to open file {}", path);
             match tokio::fs::File::open(path).await {
                 Ok(file) => {
-                    let reader_stream = tokio_util::io::ReaderStream::new(file);
-
-                    // Convert to http_body_util::BoxBody
-                    let stream_body =
-                        http_body_util::StreamBody::new(reader_stream.map_ok(Frame::data));
-                    let boxed_body = stream_body.boxed();
+                    let reader_stream: tokio_util::io::ReaderStream<tokio::fs::File> =
+                        tokio_util::io::ReaderStream::new(file);
+                    let boxed_body = Self::stream_to_boxed_body(reader_stream);
 
                     // Send response
                     let response = Response::builder()
@@ -100,35 +100,45 @@ impl PostHandler {
 
     async fn get_request_body_as_string(
         request: Request<Incoming>,
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<String, HandlerError> {
         Ok(
             String::from_utf8(request.collect().await?.to_bytes().to_vec())
                 .expect("Couldn't parse bytes."),
         )
     }
 
-    async fn echo(
-        request: Request<Incoming>,
-    ) -> Result<HandlerResponse, Box<dyn std::error::Error + Send + Sync>> {
-        let as_string = Self::get_request_body_as_string(request).await?;
-        Ok(Response::new(BoxBody::new(Bytes::from(as_string))))
+    fn full_to_boxed_body<T: Into<Bytes>>(chunk: T) -> HandlerBody {
+        Full::new(chunk.into())
+            .map_err(|never| match never {})
+            .boxed()
     }
 
-    async fn bdd(
-        request: Request<Incoming>,
-    ) -> Result<HandlerResponse, Box<dyn std::error::Error + Send + Sync>> {
+    fn stream_to_boxed_body(stream: ReaderStream<tokio::fs::File>) -> HandlerBody {
+        let remapped_stream = stream.map_err(|e| match e {
+            e => Box::new(e) as HandlerError,
+        });
+        let stream_body = http_body_util::StreamBody::new(remapped_stream.map_ok(Frame::data));
+        stream_body.boxed()
+    }
+
+    async fn echo(request: Request<Incoming>) -> HandlerResult {
+        let as_string = Self::get_request_body_as_string(request).await?;
+        Ok(Response::new(Self::full_to_boxed_body(as_string)))
+    }
+
+    async fn bdd(request: Request<Incoming>) -> HandlerResult {
         let as_string = Self::get_request_body_as_string(request).await?;
 
         let bdd: BlockDivisionInput = match serde_json::from_str(&as_string) {
             Ok(data) => data,
             Err(_e) => {
                 eprintln!("Could not parse package. {:?}", &as_string);
-                return Ok(Response::new(BoxBody::new(Full::new(Bytes::from(
-                    "Invalid JSON",
-                )))));
+                return Ok(Response::new(Self::full_to_boxed_body("Invalid JSON")));
             }
         };
 
-        return Ok(Response::new(Full::new(Bytes::from("Not yet implemented"))));
+        return Ok(Response::new(Self::full_to_boxed_body(
+            "Not yet implemented",
+        )));
     }
 }
