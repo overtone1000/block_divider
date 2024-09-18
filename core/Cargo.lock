@@ -97,6 +97,7 @@ dependencies = [
  "futures-util",
  "http-body-util",
  "hyper",
+ "hyper-trm",
  "hyper-util",
  "lettre",
  "rand",
@@ -447,6 +448,16 @@ dependencies = [
  "smallvec",
  "tokio",
  "want",
+]
+
+[[package]]
+name = "hyper-trm"
+version = "0.1.0"
+dependencies = [
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "tokio",
 ]
 
 [[package]]

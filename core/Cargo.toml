@@ -15,3 +15,4 @@ hyper-util = { version = "^0.1", features = ["full"] }
 chrono = { version = "^0.4", features = ["serde"] }
 rand = "^0"
 lettre = "^0"
+hyper-trm = { path = "../../trm-rust-libs/hyper-trm" }
