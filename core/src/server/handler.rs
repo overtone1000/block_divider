@@ -6,9 +6,12 @@ use hyper::{
     service::Service,
     Method, Request, Response,
 };
-use hyper_trm::generic_service::{
-    full_to_boxed_body, get_request_body_as_string, not_found, send_file, HandlerBody,
-    HandlerError, HandlerFuture, HandlerResponse, HandlerResult,
+use hyper_trm::{
+    commons::{
+        full_to_boxed_body, get_request_body_as_string, not_found, send_file, HandlerBody,
+        HandlerError, HandlerFuture, HandlerResponse, HandlerResult,
+    },
+    generic_service::Handler,
 };
 
 use crate::data::block_division::BlockDivisionInput;
