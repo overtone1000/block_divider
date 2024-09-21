@@ -11,7 +11,7 @@ use hyper_trm::{
         full_to_boxed_body, get_request_body_as_string, not_found, send_file, HandlerBody,
         HandlerError, HandlerFuture, HandlerResponse, HandlerResult,
     },
-    generic_service::Handler,
+    service::stateless_service::StatelessHandler,
 };
 
 use crate::data::block_division::BlockDivisionInput;
@@ -21,22 +21,7 @@ use futures_util::TryStreamExt;
 #[derive(Clone)]
 pub struct PostHandler {}
 
-impl Service<Request<Incoming>> for PostHandler {
-    type Response = HandlerResponse;
-    type Error = HandlerError;
-    type Future = HandlerFuture;
-
-    fn call(&self, request: Request<Incoming>) -> Self::Future {
-        let result = Self::handle_request(request);
-        Box::pin(result)
-    }
-}
-
-impl PostHandler {
-    pub fn new() -> PostHandler {
-        PostHandler {}
-    }
-
+impl StatelessHandler for PostHandler {
     async fn handle_request(request: Request<Incoming>) -> HandlerResult {
         let method = request.method().clone();
         let path = request.uri().path();
@@ -52,6 +37,12 @@ impl PostHandler {
                 return Ok(not_found());
             }
         }
+    }
+}
+
+impl PostHandler {
+    pub fn new() -> PostHandler {
+        PostHandler {}
     }
 
     async fn echo(request: Request<Incoming>) -> HandlerResult {
