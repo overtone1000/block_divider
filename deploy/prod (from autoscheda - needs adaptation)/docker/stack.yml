@@ -1,0 +1,211 @@
+version: '3.8'
+services:
+
+  nginx:
+    networks:
+      - internal_net
+    ports:
+      - "80:80"
+      - "443:443"
+    image: overtone1000/nginx_certbot:alpine
+    volumes:
+      - nginx:/etc/nginx/sites-available/ #certbot will make changes that need to persist
+      - static_content:/var/www/html/ #allow static content to persist
+      - certbot:/etc/letsencrypt/ #certbot will make changes that need to persist
+      - certbot_var:/var/lib/letsencrypt/ #certbot will make changes that need to persist  
+      - /etc/timezone:/etc/timezone:ro  #Set time zone to be the same as the host machine
+      - /etc/localtime:/etc/localtime:ro #Set local time to be the same as the host machine
+    configs:
+      - source: loki_credentials
+        target: /etc/nginx/passwords
+    environment:
+      CERTBOT_WEBHOOK_PRE: "https://health.overdesigned.org/ping/483c2762-92e7-433a-93b1-d0f7a841ba41/start" #webhook for certbot pre-renewal
+      CERTBOT_WEBHOOK_POST: "https://health.overdesigned.org/ping/483c2762-92e7-433a-93b1-d0f7a841ba41" #webhook for certbot post-renewal
+      HEALTHCHECK_URL: "https://health.overdesigned.org/ping/00242d37-a34f-47ff-9f19-2ca0b3d44b59" #webhook for certbot post-renewal
+    depends_on:
+      - backend
+    logging:
+      driver: loki
+      options:
+        loki-url: https://autoscheda:2dSgzwic94b9c@loki.autoscheda.com/loki/api/v1/push
+        loki-external-labels: job=nginx,owner=tyler,environment=prod
+        max-size: 5m
+        mode: non-blocking
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.name==manager
+
+  postgres:
+    image: postgres:12
+    networks:
+      - internal_net
+    volumes:
+      - autoscheda_postgres:/var/lib/postgresql/data/ #need to do this directory or the container will mount a second volume
+      - /etc/timezone:/etc/timezone:ro  #Set time zone to be the same as the host machine
+      - /etc/localtime:/etc/localtime:ro #Set local time to be the same as the host machine
+    environment:
+      POSTGRES_USER: autoscheda
+      POSTGRES_PASSWORD: autoscheda
+      PGDATA: "/var/lib/postgresql/data/docker_autoscheda"
+      POSTGRES_DB: autoscheda_database
+    logging:
+      driver: loki
+      options:
+        loki-url: https://autoscheda:2dSgzwic94b9c@loki.autoscheda.com/loki/api/v1/push
+        loki-external-labels: job=postgres,owner=tyler,environment=prod
+        max-size: 5m
+        mode: non-blocking
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.name==core
+    
+  backend:
+    image: docker.io/overtone1000/autoscheda:prod
+    networks:
+      - internal_net
+    volumes:
+      - /etc/timezone:/etc/timezone:ro  #Set time zone to be the same as the host machine
+      - /etc/localtime:/etc/localtime:ro #Set local time to be the same as the host machine
+    depends_on:
+      - postgres
+    logging:
+      driver: loki
+      options:
+        loki-url: https://autoscheda:2dSgzwic94b9c@loki.autoscheda.com/loki/api/v1/push
+        loki-external-labels: job=backend,owner=tyler,environment=prod
+        max-size: 5m
+        mode: non-blocking
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.name==core
+
+  autorestic:
+    image: docker.io/overtone1000/autorestic:latest
+    volumes:
+      #Set time to be the same as host machine for autorestic's cron
+      - /etc/timezone:/etc/timezone:ro  #Set time zone to be the same as the host machine
+      - /etc/localtime:/etc/localtime:ro #Set local time to be the same as the host machine
+      #Backed up volumes need to be added to sources!
+      - autoscheda_postgres:/sources/autoscheda_postgres
+      #- grafana:/sources/grafana #can't backup grafana because it's on a different node
+    environment:
+      REMOTE_BACKUP_CRON: "0 * * * *" #Hourly
+      BACKEND_TYPE: s3
+      BACKEND_BUCKET: s3.overdesigned.org/autoscheda
+      RESTIC_PASSWORD: "$RESTIC_PASSWORD"
+      S3_ACCOUNT_ID: "$USER"
+      S3_ACCOUNT_KEY: "$PASSWORD"
+      KEEP_LAST: 48
+      KEEP_DAILY: 30
+      KEEP_WEEKLY: 52
+      KEEP_MONTHLY: 24
+      KEEP_YEARLY: 3
+      BEFORE_HOOK: wget https://health.overdesigned.org/ping/98bf70d4-345a-448b-9bcb-1091b160d438/start -T 10 -t 5 -O /dev/null
+      FAILURE_HOOK:  wget https://health.overdesigned.org/ping/98bf70d4-345a-448b-9bcb-1091b160d438/fail -T 10 -t 5 -O /dev/null
+      AFTER_HOOK: wget https://health.overdesigned.org/ping/98bf70d4-345a-448b-9bcb-1091b160d438 -T 10 -t 5 -O /dev/null
+      CRON_LOOP_START_HOOK: wget https://health.overdesigned.org/ping/6f04a7f2-abb3-4056-b3f7-03953c4236e8/start -T 10 -t 5 -O /dev/null
+      CRON_LOOP_FINISH_HOOK: wget https://health.overdesigned.org/ping/6f04a7f2-abb3-4056-b3f7-03953c4236e8 -T 10 -t 5 -O /dev/null
+    networks:
+      - internal_net
+    logging:
+      driver: loki
+      options:
+        loki-url: https://autoscheda:2dSgzwic94b9c@loki.autoscheda.com/loki/api/v1/push
+        loki-external-labels: job=autorestic,owner=tyler,environment=prod
+        max-size: 5m
+        mode: non-blocking
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.name==core #must be on core to access volume
+
+  grafana:
+    image: grafana/grafana:9.2.5
+    networks:
+      - internal_net
+    #configs:
+    #  - source: grafana-config
+    #    target: /etc/grafana/provisioning/datasources/datasource.yml
+    volumes:
+      - grafana:/var/lib/grafana
+      - /etc/timezone:/etc/timezone:ro  #Set time zone to be the same as the host machine
+      - /etc/localtime:/etc/localtime:ro #Set local time to be the same as the host machine
+    logging:
+      driver: local
+      options:
+        max-size: 5m
+        mode: non-blocking
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.name==manager
+
+  loki:
+    image: grafana/loki:2.7.0
+    networks:
+      - internal_net
+    #ports:
+    #  - "3100:3100"
+    configs:
+      - source: autoscheda_loki
+        target: /etc/loki/local-config.yaml
+    volumes:
+      - loki:/loki
+      - /etc/timezone:/etc/timezone:ro  #Set time zone to be the same as the host machine
+      - /etc/localtime:/etc/localtime:ro #Set local time to be the same as the host machine
+    logging:
+      driver: local
+      options:
+        max-size: 5m
+        mode: non-blocking
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.name==manager      
+
+configs:
+  autoscheda_loki:
+    name: autoscheda_loki
+    external: true
+  loki_credentials:
+    name: loki_credentials
+    external: true
+
+volumes:
+  cron:
+    name: nginx_trm_cron
+  nginx:
+    name: nginx_trm_nginxconfig
+  static_content:
+    name: nginx_trm_static_content
+  certbot:
+    name: nginx_trm_certbot
+  certbot_var:
+    name: nginx_trm_certbotvar
+  autoscheda_postgres:
+    name: autoscheda_postgres
+  grafana:
+    name: grafana
+  loki:
+    name: loki
+
+networks:
+  internal_net:
+    name: autoscheda_internal
+    driver: overlay
+    external: true

@@ -10,7 +10,7 @@ use lettre::{
 };
 use serde::Deserialize;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct MailService {
     from_address: String,
     smtp_url: String,
@@ -19,12 +19,22 @@ pub struct MailService {
     password: String,
 }
 
-const MAIL_SERVICE_FILE: &str = "./secrets/email.json";
+//const MAIL_SERVICE_FILE: &str = "./secrets/email.json";
 
-pub fn get_service() -> Result<MailService, Box<dyn std::error::Error>> {
-    let file = std::fs::File::open(MAIL_SERVICE_FILE)?;
+pub fn get_service_from_file(file: &str) -> Result<MailService, Box<dyn std::error::Error>> {
+    let file = std::fs::File::open(file)?;
     let service = serde_json::from_reader(BufReader::new(file))?;
     Ok(service)
+}
+
+pub fn get_service_from_env() -> Result<MailService, Box<dyn std::error::Error>> {
+    Ok(MailService {
+        from_address: std::env::var("EMAIL_FROM_ADDRESS")?,
+        smtp_url: std::env::var("EMAIL_SMTP_URL")?,
+        smtp_port: std::env::var("EMAIL_SMTP_PORT")?.parse()?,
+        user: std::env::var("EMAIL_USER")?,
+        password: std::env::var("EMAIL_PASSWORD")?,
+    })
 }
 
 fn get_transport(service: &MailService) -> Result<SmtpTransport, Box<dyn std::error::Error>> {
@@ -73,19 +83,22 @@ mod tests {
 
     #[test]
     fn test_secret() {
-        let service = get_service().expect("Couldn't get secret.");
+        dotenvy::dotenv().expect("Couldn't load environment variables.");
+        get_service_from_env().expect("Couldn't get mail service.");
     }
 
     #[test]
     fn test_email_connectivity() {
-        let service = get_service().expect("Couldn't get service.");
+        dotenvy::dotenv().expect("Couldn't load environment variables.");
+        let service = get_service_from_env().expect("Couldn't get service.");
         let sender = get_transport(&service).expect("Couldnt get transport.");
         sender.test_connection().expect("Connection test failed.");
     }
 
     #[test]
     fn test_self_email_send() {
-        let service = get_service().expect("Couldn't get service.");
+        dotenvy::dotenv().expect("Couldn't load environment variables.");
+        let service = get_service_from_env().expect("Couldn't get service.");
         send_mail(
             &service,
             &service.from_address,

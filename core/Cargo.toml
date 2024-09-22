@@ -15,3 +15,5 @@ chrono = { version = "^0.4", features = ["serde"] }
 rand = "^0"
 lettre = "^0"
 hyper-trm = { path = "../../trm-rust-libs/hyper-trm" }
+diesel = { version = "2.2.0", features = ["postgres"] }
+dotenvy = "^0" #loads environement variables from .env for development purposes

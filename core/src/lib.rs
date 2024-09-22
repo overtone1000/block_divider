@@ -7,7 +7,7 @@ pub mod data;
 pub mod mail;
 pub mod server;
 
-const PORT: u16 = 8180;
+const PORT: u16 = 8181;
 
 pub async fn tokio_serve<'a>() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("Building server");

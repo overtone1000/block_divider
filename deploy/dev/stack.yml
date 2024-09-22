@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+
+  postgres:
+    image:  postgres:12
+    volumes:
+      - block_divider_development:/dbdata
+    ports:
+      - 5432:5432 #open in dev, but don't leave this open in production!
+    environment:
+      - POSTGRES_USER=block_divider_development
+      - POSTGRES_PASSWORD=block_divider_development #modify and make secret in production with environment variables
+      - POSTGRES_DB=block_divider_development
+      - PGDATA=/dbdata
+    logging:
+      driver: local
+      options:
+        max-size: 1m
+
+volumes:
+  block_divider_development:
+    name: block_divider_development
