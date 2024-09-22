@@ -13,7 +13,7 @@ http-body-util = "0.1"
 hyper-util = { version = "^0.1", features = ["full"] }
 chrono = { version = "^0.4", features = ["serde"] }
 rand = "^0"
-lettre = "^0"
-hyper-trm = { path = "../../trm-rust-libs/hyper-trm" }
+hyper-services = { path = "../../trm-rust-libs/hyper-services" }
+mail = { path = "../../trm-rust-libs/mail" }
 diesel = { version = "2.2.0", features = ["postgres"] }
 dotenvy = "^0" #loads environement variables from .env for development purposes

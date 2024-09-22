@@ -1,10 +1,13 @@
 use std::net::{IpAddr, Ipv4Addr};
 
-use hyper_trm::{service::stateless_service::StatelessService, spawn_server};
+use hyper_services::{service::stateless_service::StatelessService, spawn_server};
 use server::handler::PostHandler;
 
-pub mod data;
-pub mod mail;
+//For Diesel
+pub mod schema;
+
+pub mod db;
+pub mod division;
 pub mod server;
 
 const PORT: u16 = 8181;

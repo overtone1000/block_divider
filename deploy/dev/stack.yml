@@ -8,9 +8,9 @@ services:
     ports:
       - 5432:5432 #open in dev, but don't leave this open in production!
     environment:
-      - POSTGRES_USER=block_divider_development
-      - POSTGRES_PASSWORD=block_divider_development #modify and make secret in production with environment variables
-      - POSTGRES_DB=block_divider_development
+      - POSTGRES_USER=block_divider_development_uname
+      - POSTGRES_PASSWORD=block_divider_development_pw #modify and make secret in production with environment variables
+      - POSTGRES_DB=block_divider_development_db
       - PGDATA=/dbdata
     logging:
       driver: local

@@ -6,7 +6,7 @@ use hyper::{
     service::Service,
     Method, Request, Response,
 };
-use hyper_trm::{
+use hyper_services::{
     commons::{
         full_to_boxed_body, get_request_body_as_string, not_found, send_file, HandlerBody,
         HandlerError, HandlerFuture, HandlerResponse, HandlerResult,
@@ -14,7 +14,7 @@ use hyper_trm::{
     service::stateless_service::StatelessHandler,
 };
 
-use crate::data::block_division::BlockDivisionInput;
+use crate::division::block_division::BlockDivisionInput;
 
 use futures_util::TryStreamExt;
 
