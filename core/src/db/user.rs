@@ -1,5 +1,3 @@
-use std::f32::consts::E;
-
 use diesel::prelude::*;
 use mail::is_valid_email;
 

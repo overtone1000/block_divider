@@ -2,6 +2,7 @@ use diesel::prelude::*;
 use dotenvy::dotenv;
 use std::env;
 
+pub mod division;
 pub mod user;
 
 pub fn establish_connection() -> PgConnection {

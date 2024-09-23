@@ -19,12 +19,19 @@ use super::{
 };
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
+pub struct BlockDivisionBasis {
+    pub bucket_definitions: BTreeMap<BucketName, BucketDef>,
+    pub participant_round_picks: BTreeMap<Participant, BTreeMap<RoundIndex, u64>>,
+    pub selection_rounds: Vec<RoundName>,
+}
+
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 pub struct BlockDivisionState {
-    participant_round_picks: BTreeMap<Participant, BTreeMap<RoundIndex, u64>>,
-    selection_rounds: Vec<RoundName>,
-    buckets: BTreeMap<BucketName, Bucket>,
-    selections: BTreeMap<u64, BTreeMap<Participant, BTreeSet<Selection>>>,
-    current_open_round: u64,
+    pub participant_round_picks: BTreeMap<Participant, BTreeMap<RoundIndex, u64>>,
+    pub selection_rounds: Vec<RoundName>,
+    pub buckets: BTreeMap<BucketName, Bucket>,
+    pub selections: BTreeMap<u64, BTreeMap<Participant, BTreeSet<Selection>>>,
+    pub current_open_round: u64,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -34,54 +41,35 @@ pub struct BlockDivisionInput {
     selection: Selection,
 }
 
-const STATE_CACHE_PATH: &str = "./state_cache/";
+//const STATE_CACHE_PATH: &str = "./state_cache/";
 
 impl BlockDivisionState {
+    pub fn create_empty(basis: BlockDivisionBasis) -> BlockDivisionState {
+        let mut retval = BlockDivisionState {
+            participant_round_picks: basis.participant_round_picks.clone(),
+            selection_rounds: basis.selection_rounds.clone(),
+            buckets: BTreeMap::new(),
+            selections: BTreeMap::new(),
+            current_open_round: 0,
+        };
+        for (bucket_name, bucket_def) in basis.bucket_definitions {
+            retval.buckets.insert(
+                bucket_name.to_string(),
+                Bucket {
+                    definition: bucket_def.clone(),
+                    state: BTreeMap::new(),
+                },
+            );
+        }
+        retval
+    }
+
     fn round_count(&self) -> u64 {
         self.selection_rounds.len() as u64
     }
 
-    fn get_hash(&self) -> u64 {
-        let mut hasher = std::hash::DefaultHasher::new();
-        for (bucket_name, bucket) in &self.buckets {
-            bucket_name.hash(&mut hasher);
-            bucket.definition.hash(&mut hasher);
-        }
-        self.participant_round_picks.hash(&mut hasher);
-        self.selection_rounds.hash(&mut hasher);
-        hasher.finish()
-    }
-
-    fn get_filename(&self) -> String {
-        STATE_CACHE_PATH.to_string() + &self.get_hash().to_string()
-    }
-
-    pub fn create(
-        bucket_definitions: &BTreeMap<BucketName, BucketDef>,
-        participant_round_picks: &BTreeMap<Participant, BTreeMap<RoundIndex, u64>>,
-        selection_rounds: &Vec<RoundName>,
-        use_cache_if_available: bool,
-    ) -> Result<BlockDivisionState, Box<dyn Error>> {
+    pub fn get_or_create() -> Result<BlockDivisionState, Box<dyn Error>> {
         //Initialize the return value enough to calculate the filename.
-        let mut retval = {
-            let mut initial_state = BlockDivisionState {
-                participant_round_picks: participant_round_picks.clone(),
-                selection_rounds: selection_rounds.clone(),
-                buckets: BTreeMap::new(),
-                selections: BTreeMap::new(),
-                current_open_round: 0,
-            };
-            for (bucket_name, bucket_def) in bucket_definitions {
-                initial_state.buckets.insert(
-                    bucket_name.to_string(),
-                    Bucket {
-                        definition: bucket_def.clone(),
-                        state: BTreeMap::new(),
-                    },
-                );
-            }
-            initial_state
-        };
 
         let filename = retval.get_filename();
 
@@ -328,9 +316,9 @@ mod tests {
     fn block_division_cache_and_serialization_testing() {
         let (buckets, participants, rounds) = create_basis();
 
-        BlockDivisionState::create(&buckets, &participants, &rounds, false) //create to test overwriting
+        BlockDivisionState::get_or_create(&buckets, &participants, &rounds, false) //create to test overwriting
             .expect("Should work.");
-        let bds = BlockDivisionState::create(&buckets, &participants, &rounds, false) //recreate to test ignoring
+        let bds = BlockDivisionState::get_or_create(&buckets, &participants, &rounds, false) //recreate to test ignoring
             .expect("Should work.");
 
         println!("----------------------");
@@ -339,7 +327,7 @@ mod tests {
         println!("----------------------");
         println!("");
 
-        let bds2 = BlockDivisionState::create(&buckets, &participants, &rounds, true) //recreate to test equivalence
+        let bds2 = BlockDivisionState::get_or_create(&buckets, &participants, &rounds, true) //recreate to test equivalence
             .expect("Should work.");
 
         assert!(bds == bds2); //bds created from cache must be equal to the one that created the cache
@@ -352,7 +340,7 @@ mod tests {
     #[test]
     fn selection_and_calculation() {
         let (buckets, participants, rounds) = create_basis();
-        let mut bds = BlockDivisionState::create(&buckets, &participants, &rounds, false)
+        let mut bds = BlockDivisionState::get_or_create(&buckets, &participants, &rounds, false)
             .expect("Should work.");
 
         let currentbucketname = bucketname(1);
