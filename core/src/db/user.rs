@@ -37,30 +37,13 @@ impl User {
         Ok(new_user)
     }
 
-    pub fn get_user(
-        conn: &mut PgConnection,
-        email: &str,
-    ) -> Result<Option<User>, Box<dyn std::error::Error>> {
-        let results = users::table
+    pub fn get_user(conn: &mut PgConnection, email: &str) -> Option<User> {
+        users::table
             .find(email)
             .select(User::as_select())
-            .load(conn)
-            .optional();
-
-        match results {
-            Ok(Some(results)) => {
-                if results.len() > 1 {
-                    Err("More than one user found with the provided e-mail.".into())
-                } else if results.len() < 1 {
-                    Ok(None)
-                } else {
-                    println!("Results are {:?}", results);
-                    Ok(Some(results.get(0).expect("Bad check").clone()))
-                }
-            }
-            Ok(None) => Ok(None),
-            Err(e) => Err(Box::new(e)),
-        }
+            .first(conn)
+            .optional()
+            .expect("Should return option.")
     }
 
     pub fn delete_user(
@@ -89,9 +72,7 @@ mod tests {
         )
         .expect("Couldn't create test user.");
 
-        let get_test_user = User::get_user(conn, &test_user.email)
-            .expect("Should contain user.")
-            .expect("Should be some");
+        let get_test_user = User::get_user(conn, &test_user.email).expect("Should contain user.");
 
         assert_eq!(test_user, get_test_user);
 
@@ -100,7 +81,7 @@ mod tests {
 
         assert!(delete_count == 1);
 
-        let get_test_user = User::get_user(conn, &test_user.email).expect("Should contain user.");
+        let get_test_user = User::get_user(conn, &test_user.email);
 
         assert!(get_test_user.is_none());
     }

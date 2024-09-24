@@ -57,63 +57,7 @@ impl BucketState {
     }
 }
 
-impl Bucket {
-    pub fn attempt_selection(
-        &mut self,
-        round: &u64,
-        participant: &Participant,
-        selection: &Selection,
-    ) -> bool {
-        let round_state = self.get_state(&round);
-
-        //Check ancillary designations first. If this participant loses any, reject the selection
-        for ancillary_designation in &selection.ancillaries {
-            if !self
-                .ancillary_designation_is_available_for_this_round(&round, &ancillary_designation)
-            {
-                //Can't get ancillary, so selection is denied
-                return false;
-            }
-
-            match round_state
-                .ancillary_designations
-                .get(ancillary_designation)
-            {
-                Some(current_ancillary_designee) => {
-                    if !round_state.is_winner(participant, current_ancillary_designee) {
-                        //Can't get ancillary, so selection is denied
-                        return false;
-                    }
-                }
-                None => {}
-            }
-        }
-
-        let slots_available = self.slots_available_this_round(round);
-
-        let mut candidates: BTreeSet<Participant> =
-            round_state.designations.clone().into_iter().collect();
-        candidates.insert(participant.to_string());
-
-        let winners = round_state.get_winners(&candidates, slots_available);
-
-        if winners.contains(participant) {
-            //Update ancillaries and designations
-            let round_state_mut = self.get_state_mut(round);
-            round_state_mut.designations = winners;
-
-            for ancillary_designation in &selection.ancillaries {
-                round_state_mut
-                    .ancillary_designations
-                    .insert(ancillary_designation.to_string(), participant.to_string());
-            }
-
-            true
-        } else {
-            false
-        }
-    }
-
+impl BucketStates {
     fn ancillary_designation_is_available_for_this_round(
         &self,
         round: &u64,
@@ -131,27 +75,18 @@ impl Bucket {
         true
     }
 
-    fn slots_available_this_round(&self, round: &u64) -> u64 {
-        let mut used_slots: u64 = 0;
-        for current_round in 0..*round {
-            used_slots += self.get_state(&current_round).designations.len() as u64;
-        }
-        self.definition.available_slots - used_slots
-    }
-
     fn get_state(&self, round: &u64) -> &BucketState {
-        self.state.get(round).expect("Should exist.")
+        self.round_states.get(round).expect("Should exist.")
     }
 
     fn get_state_mut(&mut self, round: &u64) -> &mut BucketState {
-        self.state.get_mut(round).expect("Should exist.")
+        self.round_states.get_mut(round).expect("Should exist.")
     }
 
     fn selection_result(&self, round: &u64, participant: &Participant, selection: &Selection) {}
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
-pub struct Bucket {
-    pub(crate) definition: BucketDef,
-    pub(crate) state: BTreeMap<u64, BucketState>, //the state of each round in this bucket
+pub struct BucketStates {
+    pub(crate) round_states: BTreeMap<u64, BucketState>, //the state of each round in this bucket
 }

@@ -1,3 +1,4 @@
+use diesel::PgConnection;
 use rand::prelude::*;
 
 use std::{
@@ -11,14 +12,16 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
+use crate::db::division::PersistentDivision;
+
 use super::{
-    bucket::{self, Bucket, BucketDef, BucketName, BucketState, Ranks},
+    bucket::{self, BucketDef, BucketName, BucketState, BucketStates, Ranks},
     participant::Participant,
     round::{RoundIndex, RoundName},
     selections::Selection,
 };
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct BlockDivisionBasis {
     pub bucket_definitions: BTreeMap<BucketName, BucketDef>,
     pub participant_round_picks: BTreeMap<Participant, BTreeMap<RoundIndex, u64>>,
@@ -27,9 +30,8 @@ pub struct BlockDivisionBasis {
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 pub struct BlockDivisionState {
-    pub participant_round_picks: BTreeMap<Participant, BTreeMap<RoundIndex, u64>>,
-    pub selection_rounds: Vec<RoundName>,
-    pub buckets: BTreeMap<BucketName, Bucket>,
+    pub basis: BlockDivisionBasis,
+    pub bucket_states: BTreeMap<BucketName, BucketStates>,
     pub selections: BTreeMap<u64, BTreeMap<Participant, BTreeSet<Selection>>>,
     pub current_open_round: u64,
 }
@@ -44,20 +46,18 @@ pub struct BlockDivisionInput {
 //const STATE_CACHE_PATH: &str = "./state_cache/";
 
 impl BlockDivisionState {
-    pub fn create_empty(basis: BlockDivisionBasis) -> BlockDivisionState {
+    pub fn create_empty(basis: &BlockDivisionBasis) -> BlockDivisionState {
         let mut retval = BlockDivisionState {
-            participant_round_picks: basis.participant_round_picks.clone(),
-            selection_rounds: basis.selection_rounds.clone(),
-            buckets: BTreeMap::new(),
+            basis: basis.clone(),
+            bucket_states: BTreeMap::new(),
             selections: BTreeMap::new(),
             current_open_round: 0,
         };
-        for (bucket_name, bucket_def) in basis.bucket_definitions {
-            retval.buckets.insert(
+        for (bucket_name, bucket_def) in &basis.bucket_definitions {
+            retval.bucket_states.insert(
                 bucket_name.to_string(),
-                Bucket {
-                    definition: bucket_def.clone(),
-                    state: BTreeMap::new(),
+                BucketStates {
+                    round_states: BTreeMap::new(),
                 },
             );
         }
@@ -65,66 +65,18 @@ impl BlockDivisionState {
     }
 
     fn round_count(&self) -> u64 {
-        self.selection_rounds.len() as u64
-    }
-
-    pub fn get_or_create() -> Result<BlockDivisionState, Box<dyn Error>> {
-        //Initialize the return value enough to calculate the filename.
-
-        let filename = retval.get_filename();
-
-        let file_exists = std::path::Path::is_file(std::path::Path::new(&filename));
-
-        if use_cache_if_available && file_exists {
-            println!("Loading cached ranks.");
-            match std::fs::File::open(&filename) {
-                Ok(file) => {
-                    retval.buckets = serde_json::from_reader(BufReader::new(file))
-                        .expect("Couldn't deserialize file.");
-                }
-                Err(e) => {
-                    panic!("Coudln't open cache file! {:?}", e)
-                }
-            };
-        } else {
-            //Input bucket definitions
-            for (bucket_name, bucket_definition) in bucket_definitions {
-                let mut new_bucket = Bucket {
-                    definition: bucket_definition.clone(),
-                    state: BTreeMap::new(),
-                };
-                for n in 0..retval.round_count() {
-                    new_bucket.state.insert(n, BucketState::default());
-                }
-                retval.buckets.insert(bucket_name.to_string(), new_bucket);
-            }
-
-            println!("Generating ranks.");
-            retval.generate_ranks();
-
-            std::fs::create_dir_all(STATE_CACHE_PATH).expect("Should be able to make path.");
-            match std::fs::File::create(&filename) {
-                Ok(file) => {
-                    file.set_len(0).expect("Couldn't clear file.");
-                    serde_json::to_writer(BufWriter::new(file), &retval.buckets)
-                        .expect("Error writing hash file!");
-                }
-                Err(e) => {
-                    panic!("Couldn't create hash file! {:?}", e);
-                }
-            }
-        }
-
-        Ok(retval)
+        self.basis.selection_rounds.len() as u64
     }
 
     pub fn input_selection(
         &mut self,
+        conn: &mut PgConnection,
         participant: Participant,
         selections: BTreeSet<Selection>,
         round: u64,
     ) {
         let pick_count = self
+            .basis
             .participant_round_picks
             .get(&participant)
             .expect("Should exist.")
@@ -149,22 +101,24 @@ impl BlockDivisionState {
             round_selections.insert(participant, selections);
             self.determine_designations_from_current_selections();
         }
+
+        self.save_state(conn);
     }
 
     fn determine_designations_from_current_selections(&mut self) {
         for round in 0..self.round_count() {
-            match self.selections.get(&round) {
+            match self.selections.get_mut(&round) {
                 Some(participant_selections_map) => {
                     for (participant, selections) in participant_selections_map {
-                        for selection in selections {
-                            let bucket =
-                                self.buckets
-                                    .get_mut(&selection.bucket_name)
-                                    .expect(&format!(
-                                        "Key {} should exist in bucket but wasn't found.",
-                                        &selection.bucket_name
-                                    ));
-                            bucket.attempt_selection(&round, participant, selection);
+                        for selection in selections.into_iter() {
+                            let bucket = &self
+                                .bucket_states
+                                .get_mut(&selection.bucket_name)
+                                .expect(&format!(
+                                    "Key {} should exist in bucket but wasn't found.",
+                                    &selection.bucket_name
+                                ));
+                            self.attempt_selection(&round, &participant, &selection);
                         }
                     }
                 }
@@ -173,10 +127,12 @@ impl BlockDivisionState {
         }
     }
 
-    fn save_state(&mut self) {}
+    fn save_state(&mut self, conn: &mut PgConnection) {
+        PersistentDivision::update(conn)
+    }
 
     fn generate_ranks(&mut self) {
-        let participant_count = self.participant_round_picks.len() as u64;
+        let participant_count = self.basis.participant_round_picks.len() as u64;
         let mut initial_available_ranks: BTreeSet<u64> = BTreeSet::new();
 
         for n in 0..participant_count {
@@ -188,10 +144,10 @@ impl BlockDivisionState {
         println!("Iterating through {} rounds.", self.round_count());
         for round in 0..self.round_count() {
             println!("Round {}", round);
-            for (bucket_name, bucket) in &mut self.buckets {
+            for (bucket_name, bucket) in &mut self.bucket_states {
                 let mut bucket_state_this_round: BTreeMap<Participant, u64> = BTreeMap::new();
 
-                for participant in self.participant_round_picks.keys() {
+                for participant in self.basis.participant_round_picks.keys() {
                     /*
                     println!("");
                     println!(
@@ -244,8 +200,11 @@ impl BlockDivisionState {
                     */
                 }
 
-                bucket.state.get_mut(&round).expect("Should exist.").ranks =
-                    bucket_state_this_round;
+                bucket
+                    .round_states
+                    .get_mut(&round)
+                    .expect("Should exist.")
+                    .ranks = bucket_state_this_round;
             }
         }
     }
@@ -254,11 +213,93 @@ impl BlockDivisionState {
         let serialized = serde_json::to_string_pretty(self).expect("Should serialize.");
         println!("{}", serialized);
     }
+
+    fn slots_available_this_round(&self, bucket_name: &str, round: &u64) -> u64 {
+        let mut used_slots: u64 = 0;
+        for current_round in 0..*round {
+            used_slots += self
+                .bucket_states
+                .get(bucket_name)
+                .expect("Bucket should exist.")
+                .round_states
+                .get(&current_round)
+                .expect("Round should exist")
+                .designations
+                .len() as u64;
+        }
+
+        let available_slots = self
+            .basis
+            .bucket_definitions
+            .get(bucket_name)
+            .expect("Bucket should exist.")
+            .available_slots;
+
+        available_slots - used_slots
+    }
+
+    pub fn attempt_selection(
+        &mut self,
+        round: &u64,
+        participant: &Participant,
+        selection: &Selection,
+    ) -> bool {
+        let round_state = self.get_state(&round);
+
+        //Check ancillary designations first. If this participant loses any, reject the selection
+        for ancillary_designation in &selection.ancillaries {
+            if !self
+                .ancillary_designation_is_available_for_this_round(&round, &ancillary_designation)
+            {
+                //Can't get ancillary, so selection is denied
+                return false;
+            }
+
+            match round_state
+                .ancillary_designations
+                .get(ancillary_designation)
+            {
+                Some(current_ancillary_designee) => {
+                    if !round_state.is_winner(participant, current_ancillary_designee) {
+                        //Can't get ancillary, so selection is denied
+                        return false;
+                    }
+                }
+                None => {}
+            }
+        }
+
+        let slots_available = self.slots_available_this_round(round);
+
+        let mut candidates: BTreeSet<Participant> =
+            round_state.designations.clone().into_iter().collect();
+        candidates.insert(participant.to_string());
+
+        let winners = round_state.get_winners(&candidates, slots_available);
+
+        if winners.contains(participant) {
+            //Update ancillaries and designations
+            let round_state_mut = self.get_state_mut(round);
+            round_state_mut.designations = winners;
+
+            for ancillary_designation in &selection.ancillaries {
+                round_state_mut
+                    .ancillary_designations
+                    .insert(ancillary_designation.to_string(), participant.to_string());
+            }
+
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::char::ParseCharError;
+
+    use crate::db::{division::PersistentDivision, establish_connection};
 
     use super::*;
 
@@ -273,11 +314,7 @@ mod tests {
         "Bucket ".to_string() + &i.to_string()
     }
 
-    fn create_basis() -> (
-        std::collections::BTreeMap<std::string::String, bucket::BucketDef>,
-        std::collections::BTreeMap<std::string::String, std::collections::BTreeMap<u64, u64>>,
-        Vec<std::string::String>,
-    ) {
+    fn create_basis() -> BlockDivisionBasis {
         let mut buckets: BTreeMap<BucketName, BucketDef> = BTreeMap::new();
 
         for n in 1..NUMBER_OF_BUCKETS + 1 {
@@ -309,16 +346,22 @@ mod tests {
         participants.insert(PARTICIPANT_B.to_string(), round_picks.clone());
         participants.insert(PARTICIPANT_C.to_string(), round_picks.clone());
 
-        (buckets, participants, rounds)
+        BlockDivisionBasis {
+            bucket_definitions: buckets,
+            participant_round_picks: participants,
+            selection_rounds: rounds,
+        }
     }
 
     #[test]
     fn block_division_cache_and_serialization_testing() {
-        let (buckets, participants, rounds) = create_basis();
+        dotenvy::dotenv().expect("Couldn't load environment variables.");
+        let mut conn = establish_connection();
+        let basis = create_basis();
 
-        BlockDivisionState::get_or_create(&buckets, &participants, &rounds, false) //create to test overwriting
+        PersistentDivision::get_or_create(&mut conn, &basis, false) //create to test overwriting
             .expect("Should work.");
-        let bds = BlockDivisionState::get_or_create(&buckets, &participants, &rounds, false) //recreate to test ignoring
+        let bds = PersistentDivision::get_or_create(&mut conn, &basis, false) //recreate to test ignoring
             .expect("Should work.");
 
         println!("----------------------");
@@ -327,7 +370,7 @@ mod tests {
         println!("----------------------");
         println!("");
 
-        let bds2 = BlockDivisionState::get_or_create(&buckets, &participants, &rounds, true) //recreate to test equivalence
+        let bds2 = PersistentDivision::get_or_create(&mut conn, &basis, true) //recreate to test equivalence
             .expect("Should work.");
 
         assert!(bds == bds2); //bds created from cache must be equal to the one that created the cache
@@ -339,9 +382,12 @@ mod tests {
 
     #[test]
     fn selection_and_calculation() {
-        let (buckets, participants, rounds) = create_basis();
-        let mut bds = BlockDivisionState::get_or_create(&buckets, &participants, &rounds, false)
-            .expect("Should work.");
+        dotenvy::dotenv().expect("Couldn't load environment variables.");
+        let mut conn = establish_connection();
+        let basis = create_basis();
+
+        let mut bds =
+            PersistentDivision::get_or_create(&mut conn, &basis, false).expect("Should work.");
 
         let currentbucketname = bucketname(1);
         let currentround = 0;
@@ -353,7 +399,12 @@ mod tests {
             bucket_name: currentbucketname.to_string(),
             ancillaries: ancillaries_a,
         });
-        bds.input_selection(PARTICIPANT_A.to_string(), selections_a, currentround);
+        bds.input_selection(
+            &mut conn,
+            PARTICIPANT_A.to_string(),
+            selections_a,
+            currentround,
+        );
         bds.determine_designations_from_current_selections();
 
         /*
@@ -365,10 +416,10 @@ mod tests {
         */
 
         let pertinent_designations = &bds
-            .buckets
+            .bucket_states
             .get(&currentbucketname)
             .expect("Should exist.")
-            .state
+            .round_states
             .get(&currentround)
             .expect("Should exist.")
             .designations;

@@ -2,14 +2,14 @@
 
 diesel::table! {
     divisions (hash) {
-        hash -> Varchar,
+        hash -> Text,
         serialized -> Text,
     }
 }
 
 diesel::table! {
     users (email) {
-        email -> Varchar,
+        email -> Text,
         hashed_password -> Nullable<Varchar>,
         display_name -> Varchar,
     }

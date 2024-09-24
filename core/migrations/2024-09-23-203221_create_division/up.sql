@@ -1,4 +1,4 @@
 CREATE TABLE divisions (
-    hash VARCHAR PRIMARY KEY,
+    hash TEXT PRIMARY KEY NOT NULL,
     serialized TEXT NOT NULL
 )

@@ -9,7 +9,7 @@ use mail::is_valid_email;
 use crate::{
     division::{
         block_division::{BlockDivisionBasis, BlockDivisionState},
-        bucket::Bucket,
+        bucket::BucketStates,
     },
     schema::divisions,
 };
@@ -34,39 +34,48 @@ impl PersistentDivision {
         hasher.finish()
     }
 
-    fn get() {}
+    fn get(conn: &mut PgConnection, basis: &BlockDivisionBasis) -> Option<PersistentDivision> {
+        let hash = Self::get_hash(&basis).to_string();
+        divisions::table
+            .find(hash)
+            .select(PersistentDivision::as_select())
+            .first(conn)
+            .optional()
+            .expect("Should return option.")
+    }
 
     fn insert(
+        conn: &mut PgConnection,
         insertion: PersistentDivision,
     ) -> Result<PersistentDivision, Box<dyn std::error::Error>> {
+        diesel::insert_into(divisions::table)
+            .values(&insertion)
+            .execute(conn)?;
+
+        Ok(insertion)
+    }
+
+    pub fn update(
+        conn: &mut PgConnection,
+        state: &BlockDivisionState,
+    ) -> Result<PersistentDivision, Box<dyn std::error::Error>> {
+        diesel::insert_into(divisions::table)
+            .values(&insertion)
+            .execute(conn)?;
+
+        Ok(insertion)
     }
 
     pub fn get_or_create(
         conn: &mut PgConnection,
-        basis: BlockDivisionBasis,
-        use_cache_if_available: bool,
+        basis: &BlockDivisionBasis,
+        use_persistent_if_exists: bool,
     ) -> Result<BlockDivisionState, Box<dyn std::error::Error>> {
         let hash = Self::get_hash(&basis).to_string();
 
-        let results = divisions::table
-            .find(&hash)
-            .select(PersistentDivision::as_select())
-            .load(conn)
-            .optional();
-
-        let resulting_persistent_division = match results {
-            Ok(Some(results)) => {
-                if results.len() > 1 {
-                    return Err("More than one division found with the provided hash.".into());
-                } else if results.len() < 1 {
-                    None
-                } else {
-                    println!("Results are {:?}", results);
-                    Some(results.get(0).expect("Bad check").clone())
-                }
-            }
-            Ok(None) => None,
-            Err(e) => return Err(Box::new(e)),
+        let resulting_persistent_division = match use_persistent_if_exists {
+            true => Self::get(conn, basis),
+            false => None,
         };
 
         match resulting_persistent_division {
@@ -74,10 +83,13 @@ impl PersistentDivision {
             None => {
                 let retval = BlockDivisionState::create_empty(basis);
 
-                Self::insert(PersistentDivision {
-                    hash: hash,
-                    serialized: serde_json::to_string(&retval)?,
-                });
+                Self::insert(
+                    conn,
+                    PersistentDivision {
+                        hash: hash,
+                        serialized: serde_json::to_string(&retval)?,
+                    },
+                );
 
                 Ok(retval)
             }
