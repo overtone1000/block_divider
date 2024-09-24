@@ -54,12 +54,9 @@ impl BlockDivisionState {
             current_open_round: 0,
         };
         for (bucket_name, bucket_def) in &basis.bucket_definitions {
-            retval.bucket_states.insert(
-                bucket_name.to_string(),
-                BucketStates {
-                    round_states: BTreeMap::new(),
-                },
-            );
+            retval
+                .bucket_states
+                .insert(bucket_name.to_string(), BucketStates::new());
         }
         retval
     }
@@ -200,11 +197,7 @@ impl BlockDivisionState {
                     */
                 }
 
-                bucket
-                    .round_states
-                    .get_mut(&round)
-                    .expect("Should exist.")
-                    .ranks = bucket_state_this_round;
+                bucket.get_state_mut(&round).ranks = bucket_state_this_round;
             }
         }
     }
@@ -221,9 +214,7 @@ impl BlockDivisionState {
                 .bucket_states
                 .get(bucket_name)
                 .expect("Bucket should exist.")
-                .round_states
-                .get(&current_round)
-                .expect("Round should exist")
+                .get_state(&current_round)
                 .designations
                 .len() as u64;
         }
@@ -244,11 +235,15 @@ impl BlockDivisionState {
         participant: &Participant,
         selection: &Selection,
     ) -> bool {
-        let round_state = self.get_state(&round);
+        let round_state = self
+            .bucket_states
+            .get(&selection.bucket_name)
+            .expect("Bucket should exist.")
+            .get_state(&round);
 
         //Check ancillary designations first. If this participant loses any, reject the selection
         for ancillary_designation in &selection.ancillaries {
-            if !self
+            if !round_state
                 .ancillary_designation_is_available_for_this_round(&round, &ancillary_designation)
             {
                 //Can't get ancillary, so selection is denied
@@ -269,7 +264,7 @@ impl BlockDivisionState {
             }
         }
 
-        let slots_available = self.slots_available_this_round(round);
+        let slots_available = self.slots_available_this_round(&selection.bucket_name, round);
 
         let mut candidates: BTreeSet<Participant> =
             round_state.designations.clone().into_iter().collect();

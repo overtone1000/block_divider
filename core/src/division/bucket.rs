@@ -58,7 +58,12 @@ impl BucketState {
 }
 
 impl BucketStates {
-    fn ancillary_designation_is_available_for_this_round(
+    pub fn new() -> BucketStates {
+        BucketStates {
+            round_states: BTreeMap::new(),
+        }
+    }
+    pub fn ancillary_designation_is_available_for_this_round(
         &self,
         round: &u64,
         ancillary_designation: &str,
@@ -75,18 +80,18 @@ impl BucketStates {
         true
     }
 
-    fn get_state(&self, round: &u64) -> &BucketState {
+    pub fn get_state(&self, round: &u64) -> &BucketState {
         self.round_states.get(round).expect("Should exist.")
     }
 
-    fn get_state_mut(&mut self, round: &u64) -> &mut BucketState {
+    pub fn get_state_mut(&mut self, round: &u64) -> &mut BucketState {
         self.round_states.get_mut(round).expect("Should exist.")
     }
 
-    fn selection_result(&self, round: &u64, participant: &Participant, selection: &Selection) {}
+    pub fn selection_result(&self, round: &u64, participant: &Participant, selection: &Selection) {}
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 pub struct BucketStates {
-    pub(crate) round_states: BTreeMap<u64, BucketState>, //the state of each round in this bucket
+    round_states: BTreeMap<u64, BucketState>, //the state of each round in this bucket
 }
