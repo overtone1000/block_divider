@@ -125,7 +125,7 @@ impl BlockDivisionState {
     }
 
     fn save_state(&mut self, conn: &mut PgConnection) {
-        PersistentDivision::update(conn)
+        PersistentDivision::update(conn, self)
     }
 
     fn generate_ranks(&mut self) {
@@ -414,9 +414,7 @@ mod tests {
             .bucket_states
             .get(&currentbucketname)
             .expect("Should exist.")
-            .round_states
-            .get(&currentround)
-            .expect("Should exist.")
+            .get_state(&currentround)
             .designations;
 
         let correctly_assigned = pertinent_designations.contains(PARTICIPANT_A);
