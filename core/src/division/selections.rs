@@ -2,7 +2,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-use super::participant::Participant;
+use super::{
+    block_division::BlockDivisionBasis,
+    participant::{self, Participant},
+};
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, PartialOrd, Ord, Clone)]
 pub struct Selection {
@@ -12,21 +15,34 @@ pub struct Selection {
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Selections {
-    selections: BTreeMap<u64, BTreeMap<Participant, BTreeSet<Selection>>>,
+    selections: BTreeMap<usize, BTreeMap<Participant, BTreeSet<Selection>>>,
 }
 
 impl Selections {
-    pub fn new() -> Selections {
-        Selections {
+    pub fn new(basis: &BlockDivisionBasis) -> Selections {
+        let mut retval = Selections {
             selections: BTreeMap::new(),
+        };
+
+        for round in 0..basis.selection_rounds.len() {
+            let mut participant_selection_map: BTreeMap<Participant, BTreeSet<Selection>> =
+                BTreeMap::new();
+
+            for participant in basis.participant_round_picks.keys() {
+                participant_selection_map.insert(participant.to_string(), BTreeSet::new());
+            }
+
+            retval.selections.insert(round, participant_selection_map);
         }
+
+        retval
     }
 
-    pub fn get(&self, round: &u64) -> Option<&BTreeMap<Participant, BTreeSet<Selection>>> {
+    pub fn get(&self, round: &usize) -> Option<&BTreeMap<Participant, BTreeSet<Selection>>> {
         self.selections.get(round)
     }
 
-    pub fn set(&mut self, round: u64, participant: Participant, selections: BTreeSet<Selection>) {
+    pub fn set(&mut self, round: usize, participant: Participant, selections: BTreeSet<Selection>) {
         let round_selections = match self.selections.entry(round) {
             std::collections::btree_map::Entry::Vacant(entry) => entry.insert(BTreeMap::new()),
             std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),

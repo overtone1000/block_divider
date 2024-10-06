@@ -91,7 +91,7 @@ impl PersistentDivision {
                 Ok(serde_json::from_str(str)?)
             }
             None => {
-                let retval = BlockDivisionState::create_empty(basis);
+                let retval = BlockDivisionState::new(basis);
 
                 Self::insert(
                     conn,
