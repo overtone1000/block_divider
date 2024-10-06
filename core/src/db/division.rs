@@ -7,10 +7,7 @@ use diesel::prelude::*;
 use mail::is_valid_email;
 
 use crate::{
-    division::{
-        block_division::{BlockDivisionBasis, BlockDivisionState},
-        bucket::BucketStates,
-    },
+    division::block_division::{BlockDivisionBasis, BlockDivisionState},
     schema::divisions,
 };
 
@@ -23,7 +20,7 @@ pub struct PersistentDivision {
 }
 
 impl PersistentDivision {
-    fn get_hash(basis: &BlockDivisionBasis) -> u64 {
+    fn get_hash(basis: &BlockDivisionBasis) -> String {
         let mut hasher = std::hash::DefaultHasher::new();
         for (bucket_name, bucket_definition) in &basis.bucket_definitions {
             bucket_name.hash(&mut hasher);
@@ -31,17 +28,19 @@ impl PersistentDivision {
         }
         basis.participant_round_picks.hash(&mut hasher);
         basis.selection_rounds.hash(&mut hasher);
-        hasher.finish()
+        hasher.finish().to_string()
     }
 
     fn get(conn: &mut PgConnection, basis: &BlockDivisionBasis) -> Option<PersistentDivision> {
-        let hash = Self::get_hash(&basis).to_string();
-        divisions::table
+        let hash = Self::get_hash(&basis);
+        let retval = divisions::table
             .find(hash)
             .select(PersistentDivision::as_select())
             .first(conn)
             .optional()
-            .expect("Should return option.")
+            .expect("Should return option.");
+
+        retval
     }
 
     fn insert(
@@ -60,7 +59,7 @@ impl PersistentDivision {
         state: &BlockDivisionState,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let update = PersistentDivision {
-            hash: Self::get_hash(&state.basis).to_string(),
+            hash: Self::get_hash(&state.basis),
             serialized: serde_json::to_string(&state)?,
         };
 
@@ -76,15 +75,21 @@ impl PersistentDivision {
         basis: &BlockDivisionBasis,
         use_persistent_if_exists: bool,
     ) -> Result<BlockDivisionState, Box<dyn std::error::Error>> {
-        let hash = Self::get_hash(&basis).to_string();
+        let hash = Self::get_hash(&basis);
 
         let resulting_persistent_division = match use_persistent_if_exists {
             true => Self::get(conn, basis),
-            false => None,
+            false => {
+                PersistentDivision::delete_division(conn, &hash).expect("Shouldn't panic");
+                None
+            }
         };
 
         match resulting_persistent_division {
-            Some(result) => Ok(serde_json::from_str(result.serialized.as_str())?),
+            Some(result) => {
+                let str = result.serialized.as_str();
+                Ok(serde_json::from_str(str)?)
+            }
             None => {
                 let retval = BlockDivisionState::create_empty(basis);
 
@@ -94,7 +99,7 @@ impl PersistentDivision {
                         hash: hash,
                         serialized: serde_json::to_string(&retval)?,
                     },
-                );
+                )?;
 
                 Ok(retval)
             }
@@ -103,8 +108,8 @@ impl PersistentDivision {
 
     fn delete_division(
         conn: &mut PgConnection,
-        email: &str,
+        hash: &str,
     ) -> Result<usize, diesel::result::Error> {
-        diesel::delete(divisions::table.find(email)).execute(conn)
+        diesel::delete(divisions::table.find(hash)).execute(conn)
     }
 }

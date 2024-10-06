@@ -15,10 +15,10 @@ use serde::{Deserialize, Serialize};
 use crate::db::division::PersistentDivision;
 
 use super::{
-    bucket::{self, BucketDef, BucketName, BucketState, BucketStates, Ranks},
+    bucket::{self, BucketDef, BucketName, BucketState, Ranks, RoundStates},
     participant::Participant,
     round::{RoundIndex, RoundName},
-    selections::Selection,
+    selections::{Selection, Selections},
 };
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
@@ -31,8 +31,8 @@ pub struct BlockDivisionBasis {
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 pub struct BlockDivisionState {
     pub basis: BlockDivisionBasis,
-    pub bucket_states: BTreeMap<BucketName, BucketStates>,
-    pub selections: BTreeMap<u64, BTreeMap<Participant, BTreeSet<Selection>>>,
+    pub bucket_states: BTreeMap<BucketName, RoundStates>,
+    pub selections: Selections,
     pub current_open_round: u64,
 }
 
@@ -50,13 +50,13 @@ impl BlockDivisionState {
         let mut retval = BlockDivisionState {
             basis: basis.clone(),
             bucket_states: BTreeMap::new(),
-            selections: BTreeMap::new(),
+            selections: Selections::new(),
             current_open_round: 0,
         };
         for (bucket_name, bucket_def) in &basis.bucket_definitions {
             retval
                 .bucket_states
-                .insert(bucket_name.to_string(), BucketStates::new());
+                .insert(bucket_name.to_string(), RoundStates::new(basis));
         }
         retval
     }
@@ -91,36 +91,34 @@ impl BlockDivisionState {
                 round, self.current_open_round
             );
         } else {
-            let round_selections = match self.selections.entry(round) {
-                std::collections::btree_map::Entry::Vacant(entry) => entry.insert(BTreeMap::new()),
-                std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
-            };
-            round_selections.insert(participant, selections);
+            self.selections.set(round, participant, selections);
             self.determine_designations_from_current_selections();
+            self.save_state(conn);
         }
-
-        self.save_state(conn);
     }
 
     fn determine_designations_from_current_selections(&mut self) {
+        let mut selections_to_attempt: Vec<(u64, Participant, Selection)> = Vec::new();
+
         for round in 0..self.round_count() {
             match self.selections.get(&round) {
                 Some(participant_selections_map) => {
                     for (participant, selections) in participant_selections_map {
                         for selection in selections.iter() {
-                            let bucket = &self
-                                .bucket_states
-                                .get_mut(&selection.bucket_name)
-                                .expect(&format!(
-                                    "Key {} should exist in bucket but wasn't found.",
-                                    &selection.bucket_name
-                                ));
-                            self.attempt_selection(&round, &participant, &selection);
+                            selections_to_attempt.push((
+                                round,
+                                participant.clone(),
+                                selection.clone(),
+                            ));
                         }
                     }
                 }
                 None => {}
-            }
+            };
+        }
+
+        for (round, participant, selection) in selections_to_attempt {
+            self.attempt_selection(&round, &participant, &selection);
         }
     }
 
@@ -141,7 +139,7 @@ impl BlockDivisionState {
         println!("Iterating through {} rounds.", self.round_count());
         for round in 0..self.round_count() {
             println!("Round {}", round);
-            for (bucket_name, bucket) in &mut self.bucket_states {
+            for (bucket_name, bucket) in self.bucket_states.iter_mut() {
                 let mut bucket_state_this_round: BTreeMap<Participant, u64> = BTreeMap::new();
 
                 for participant in self.basis.participant_round_picks.keys() {

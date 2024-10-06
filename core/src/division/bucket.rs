@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use serde::{Deserialize, Serialize};
 
-use super::{participant::Participant, selections::Selection};
+use super::{block_division::BlockDivisionBasis, participant::Participant, selections::Selection};
 
 pub type Designations = BTreeSet<Participant>; //Map containing selected participants. Keys are rounds of the selection.
 pub type Ranks = BTreeMap<Participant, u64>;
@@ -24,6 +24,14 @@ pub struct BucketState {
 }
 
 impl BucketState {
+    pub(crate) fn new() -> BucketState {
+        BucketState {
+            designations: Designations::new(),
+            ancillary_designations: BTreeMap::new(),
+            ranks: Ranks::new(),
+        }
+    }
+
     pub(crate) fn get_winners(
         &self,
         candidates: &BTreeSet<Participant>,
@@ -57,11 +65,20 @@ impl BucketState {
     }
 }
 
-impl BucketStates {
-    pub fn new() -> BucketStates {
-        BucketStates {
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
+pub struct RoundStates {
+    round_states: BTreeMap<u64, BucketState>, //the state of each round in this bucket
+}
+
+impl RoundStates {
+    pub fn new(basis: &BlockDivisionBasis) -> RoundStates {
+        let mut retval = RoundStates {
             round_states: BTreeMap::new(),
+        };
+        for round in 0..basis.selection_rounds.len() {
+            retval.round_states.insert(round as u64, BucketState::new());
         }
+        retval
     }
     pub fn ancillary_designation_is_available_for_this_round(
         &self,
@@ -88,10 +105,7 @@ impl BucketStates {
         self.round_states.get_mut(round).expect("Should exist.")
     }
 
-    pub fn selection_result(&self, round: &u64, participant: &Participant, selection: &Selection) {}
-}
-
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
-pub struct BucketStates {
-    round_states: BTreeMap<u64, BucketState>, //the state of each round in this bucket
+    pub fn selection_result(&self, round: &u64, participant: &Participant, selection: &Selection) {
+        panic!("Not implemented.");
+    }
 }
