@@ -104,10 +104,10 @@ impl BlockDivisionState {
 
     fn determine_designations_from_current_selections(&mut self) {
         for round in 0..self.round_count() {
-            match self.selections.get_mut(&round) {
+            match self.selections.get(&round) {
                 Some(participant_selections_map) => {
                     for (participant, selections) in participant_selections_map {
-                        for selection in selections.into_iter() {
+                        for selection in selections.iter() {
                             let bucket = &self
                                 .bucket_states
                                 .get_mut(&selection.bucket_name)
@@ -124,7 +124,7 @@ impl BlockDivisionState {
         }
     }
 
-    fn save_state(&mut self, conn: &mut PgConnection) {
+    fn save_state(&mut self, conn: &mut PgConnection) -> Result<(), Box<dyn std::error::Error>> {
         PersistentDivision::update(conn, self)
     }
 
@@ -235,46 +235,54 @@ impl BlockDivisionState {
         participant: &Participant,
         selection: &Selection,
     ) -> bool {
-        let round_state = self
-            .bucket_states
-            .get(&selection.bucket_name)
-            .expect("Bucket should exist.")
-            .get_state(&round);
+        let winners = {
+            let bucket_states = self
+                .bucket_states
+                .get(&selection.bucket_name)
+                .expect("Bucket should exist.");
+            let round_state = bucket_states.get_state(&round);
 
-        //Check ancillary designations first. If this participant loses any, reject the selection
-        for ancillary_designation in &selection.ancillaries {
-            if !round_state
-                .ancillary_designation_is_available_for_this_round(&round, &ancillary_designation)
-            {
-                //Can't get ancillary, so selection is denied
-                return false;
-            }
-
-            match round_state
-                .ancillary_designations
-                .get(ancillary_designation)
-            {
-                Some(current_ancillary_designee) => {
-                    if !round_state.is_winner(participant, current_ancillary_designee) {
-                        //Can't get ancillary, so selection is denied
-                        return false;
-                    }
+            //Check ancillary designations first. If this participant loses any, reject the selection
+            for ancillary_designation in &selection.ancillaries {
+                if !bucket_states.ancillary_designation_is_available_for_this_round(
+                    &round,
+                    &ancillary_designation,
+                ) {
+                    //Can't get ancillary, so selection is denied
+                    return false;
                 }
-                None => {}
+
+                match round_state
+                    .ancillary_designations
+                    .get(ancillary_designation)
+                {
+                    Some(current_ancillary_designee) => {
+                        if !round_state.is_winner(participant, current_ancillary_designee) {
+                            //Can't get ancillary, so selection is denied
+                            return false;
+                        }
+                    }
+                    None => {}
+                }
             }
-        }
 
-        let slots_available = self.slots_available_this_round(&selection.bucket_name, round);
+            let slots_available = self.slots_available_this_round(&selection.bucket_name, round);
 
-        let mut candidates: BTreeSet<Participant> =
-            round_state.designations.clone().into_iter().collect();
-        candidates.insert(participant.to_string());
+            let mut candidates: BTreeSet<Participant> =
+                round_state.designations.clone().into_iter().collect();
+            candidates.insert(participant.to_string());
 
-        let winners = round_state.get_winners(&candidates, slots_available);
+            round_state.get_winners(&candidates, slots_available)
+        };
 
         if winners.contains(participant) {
             //Update ancillaries and designations
-            let round_state_mut = self.get_state_mut(round);
+            let bucket_states_mut = self
+                .bucket_states
+                .get_mut(&selection.bucket_name)
+                .expect("Bucket should exist.");
+            let round_state_mut = bucket_states_mut.get_state_mut(&round);
+
             round_state_mut.designations = winners;
 
             for ancillary_designation in &selection.ancillaries {

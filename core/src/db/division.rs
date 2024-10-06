@@ -47,23 +47,28 @@ impl PersistentDivision {
     fn insert(
         conn: &mut PgConnection,
         insertion: PersistentDivision,
-    ) -> Result<PersistentDivision, Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         diesel::insert_into(divisions::table)
             .values(&insertion)
             .execute(conn)?;
 
-        Ok(insertion)
+        Ok(())
     }
 
     pub fn update(
         conn: &mut PgConnection,
         state: &BlockDivisionState,
-    ) -> Result<PersistentDivision, Box<dyn std::error::Error>> {
-        diesel::insert_into(divisions::table)
-            .values(&insertion)
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let update = PersistentDivision {
+            hash: Self::get_hash(&state.basis).to_string(),
+            serialized: serde_json::to_string(&state)?,
+        };
+
+        diesel::update(divisions::table.find(update.hash))
+            .set(divisions::serialized.eq(update.serialized))
             .execute(conn)?;
 
-        Ok(insertion)
+        Ok(())
     }
 
     pub fn get_or_create(
