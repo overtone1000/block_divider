@@ -2,6 +2,8 @@
 	import { mdiThemeLightDark } from "@mdi/js";
 	import IconButton, { Icon } from "@smui/icon-button";
 
+	export let title: string;
+
 	const light_css = "/smui.css";
 	const dark_css = "/smui-dark.css";
 
@@ -22,21 +24,22 @@
 
 <div class="vp_fill">
 	<div class="top_menu">
+		<div class="top_menu_item">{title}</div>
+		<div class="spacer"></div>
 		<div class="top_menu_item">
-			<div class="spacer"></div>
-			<div class="top_menu_item">
-				<IconButton on:click={() => (dark_mode = !dark_mode)} toggle pressed={dark_mode}>
-					<Icon tag="svg" viewBox="0 0 24 24" on>
-						<path fill="currentColor" d={mdiThemeLightDark} />
-					</Icon>
-					<Icon tag="svg" viewBox="0 0 24 24">
-						<path fill="currentColor" d={mdiThemeLightDark} />
-					</Icon>
-				</IconButton>
-			</div>
+			<IconButton on:click={() => (dark_mode = !dark_mode)} toggle pressed={dark_mode}>
+				<Icon tag="svg" viewBox="0 0 24 24" on>
+					<path fill="currentColor" d={mdiThemeLightDark} />
+				</Icon>
+				<Icon tag="svg" viewBox="0 0 24 24">
+					<path fill="currentColor" d={mdiThemeLightDark} />
+				</Icon>
+			</IconButton>
 		</div>
 	</div>
-	<div class="page">Hello World</div>
+	<div class="page">
+		<slot name="contents">Nothing in slot 1</slot>
+	</div>
 </div>
 
 <style>

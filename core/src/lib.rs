@@ -21,6 +21,8 @@ pub async fn tokio_serve<'a>() -> Result<(), Box<dyn std::error::Error + Send + 
         StatelessService::<PostHandler>::create(),
     );
 
+    println!("Server up.");
+
     tokio::try_join!(server)?;
 
     Ok(())

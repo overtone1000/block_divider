@@ -1,9 +1,9 @@
 <script>
-	import Main from "../../components/main.svelte";
+	import Admin from "../../components/admin.svelte";
 </script>
 
 <svelte:head>
 	<title>Rotation Tool</title>
 </svelte:head>
 
-<Main analysis="true" />
+<Admin />
