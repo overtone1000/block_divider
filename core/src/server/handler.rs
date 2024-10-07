@@ -18,8 +18,14 @@ use crate::division::block_division::BlockDivisionInput;
 
 use futures_util::TryStreamExt;
 
+use super::block_division_post::BlockDivisionStateRequestBody;
+
 #[derive(Clone)]
 pub struct PostHandler {}
+
+const BLOCK_DIVISION_STATE: &str = "/block_division_state";
+const BLOCK_DIVISION_INPUT: &str = "/block_division_input";
+const ECHO: &str = "/echo";
 
 impl StatelessHandler for PostHandler {
     async fn handle_request(request: Request<Incoming>) -> HandlerResult {
@@ -27,11 +33,11 @@ impl StatelessHandler for PostHandler {
         let path = request.uri().path();
         let headers = request.headers().clone();
 
-        println!("Path: {}", path);
+        println!("Method: {}, Path: {}", method, path);
 
         match (method, path) {
-            (Method::POST, "bdd") => Self::bdd(request).await,
-            (Method::POST, "echo") => Self::echo(request).await,
+            (Method::POST, BLOCK_DIVISION_STATE) => Self::bdd(request).await,
+            (Method::POST, ECHO) => Self::echo(request).await,
             (Method::GET, path) => send_file(path.to_string()).await,
             _ => {
                 return Ok(not_found());
@@ -53,14 +59,19 @@ impl PostHandler {
     async fn bdd(request: Request<Incoming>) -> HandlerResult {
         let as_string = get_request_body_as_string(request).await?;
 
-        let bdd: BlockDivisionInput = match serde_json::from_str(&as_string) {
-            Ok(data) => data,
+        let mut response = match serde_json::from_str::<BlockDivisionStateRequestBody>(&as_string) {
+            Ok(request_body) => {
+                println!("Received request");
+                Response::new(full_to_boxed_body("Not yet implemented"))
+            }
             Err(_e) => {
                 eprintln!("Could not parse package. {:?}", &as_string);
-                return Ok(Response::new(full_to_boxed_body("Invalid JSON")));
+                Response::new(full_to_boxed_body("Invalid JSON"))
             }
         };
 
-        return Ok(Response::new(full_to_boxed_body("Not yet implemented")));
+        hyper_services::commons::permit_all_cors(&mut response);
+
+        return Ok(response);
     }
 }
