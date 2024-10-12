@@ -3,9 +3,9 @@ with import <nixpkgs> {};
 stdenv.mkDerivation {
     name = "dev-environment"; # Probably put a more meaningful name here
     buildInputs = [ 
-        pkg-config 
+        pkg-config #Needed by node to handle dependencies
+        openssl  #Needed by node?
         #dbus 
-        openssl 
         #glib 
         #gtk3 
         #libsoup_3
