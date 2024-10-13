@@ -17,11 +17,10 @@ use hyper_services::{
 
 use crate::db::{establish_connection, ConnectionHandler};
 
+use super::block_division_state_request::BlockDivisionPost;
 
 #[derive(Clone)]
-pub struct PostHandler {
-    db: &'static ConnectionHandler
-}
+pub struct PostHandler {}
 
 const BLOCK_DIVISION_POST: &str = "/block_division_post";
 const ECHO: &str = "/echo";
@@ -52,10 +51,9 @@ impl PostHandler {
     async fn handle_post(request: Request<Incoming>) -> HandlerResult {
         let as_string = get_request_body_as_string(request).await?;
 
-        let mut response = match serde_json::from_str::<BlockDivisionStateRequestBody>(&as_string) {
+        let mut response = match serde_json::from_str::<BlockDivisionPost>(&as_string) {
             Ok(request_body) => {
                 println!("Received request");
-                request_body.
                 Response::new(full_to_boxed_body("Not yet implemented"))
             }
             Err(_e) => {
