@@ -10,6 +10,9 @@ A tool to process vacation request and perform minimal necessary arbitration wit
 ## Local Dependencies
 The core is dependent on some local external rust libraries. See `core/Cargo.toml` which shows the relative path where those libraries need to be placed.
 
+## Nix
+A few packages are necessary for the build. These are in `default.nix`. Either run code from a nix-shell with `nix-shell default.nix` or use the plugin with `Ctrl+Shift+P`, choose `default.nix`, let the plugin build the environment, then restart code (should work from then on).
+
 ## Development vs Production
 - The core server runs on port 8180. Vite is configured to make this the post root via the `defineConfig` function in `frontend/vite.config.ts`.
     - [ ] Test that this works for both development and production

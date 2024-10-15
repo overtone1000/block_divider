@@ -5,24 +5,14 @@ with import <nixpkgs> {};
 stdenv.mkDerivation {
     name = "dev-environment"; # Probably put a more meaningful name here
     buildInputs = [ 
-        pkg-config #Needed by node to handle dependencies
-        openssl  #Needed by node?
-        openssl.dev #Needed by rust
-        dbus
-        glib 
-        gtk3 
-        libsoup_3
-        webkitgtk_4_1
-        appimagekit
+        pkg-config #Needed by rust to find other packges. node too?
+        openssl  #Needed by rust networking crates. node too?
+        postgresql #Needed by rust diesel crate with postgres feature. Just needs libpq, but no such package is currently available on Nix.
+        #dbus #Needed by tauri?
+        #glib #Needed by tauri? 
+        #gtk3 #Needed by tauri?
+        #libsoup_3 #Needed by tauri?
+        #webkitgtk_4_1 #Needed by tauri?
+        #appimagekit #Needed by tauri?
     ];
-}
-
-{
-    environment.systemPackages = with pkgs; [
-        gcc
-        #clang #c language tools for rust; should only need gcc or clang?
-	    llvmPackages.bintools #llvm package for rust
-        openssl
-        openssl.dev
-    ]
 }
