@@ -359,9 +359,15 @@ mod tests {
         let mut conn = establish_connection();
         let basis = create_basis();
 
-        PersistentDivision::get_or_create(&mut conn, &basis, false) //create to test overwriting
+        PersistentDivision::delete_division(&mut conn, &basis); //Delete any remnant, result doesn't matter
+
+        PersistentDivision::get_or_create(&mut conn, &basis) //create to test overwriting
             .expect("Should work.");
-        let bds = PersistentDivision::get_or_create(&mut conn, &basis, false) //recreate to test ignoring
+        let delete_count =
+            PersistentDivision::delete_division(&mut conn, &basis).expect("Should work"); //Delete just created, should have a result
+        assert!(delete_count == 1);
+
+        let bds = PersistentDivision::get_or_create(&mut conn, &basis) //recreate to test ignoring
             .expect("Should work.");
 
         println!("----------------------");
@@ -370,7 +376,7 @@ mod tests {
         println!("----------------------");
         println!("");
 
-        let bds2 = PersistentDivision::get_or_create(&mut conn, &basis, true) //recreate to test equivalence
+        let bds2 = PersistentDivision::get_or_create(&mut conn, &basis) //recreate to test equivalence
             .expect("Should work.");
 
         assert!(bds == bds2); //bds created from cache must be equal to the one that created the cache
@@ -386,8 +392,8 @@ mod tests {
         let mut conn = establish_connection();
         let basis = create_basis();
 
-        let mut bds =
-            PersistentDivision::get_or_create(&mut conn, &basis, false).expect("Should work.");
+        PersistentDivision::delete(&mut conn, &basis); //Delete any remnant
+        let mut bds = PersistentDivision::get_or_create(&mut conn, &basis).expect("Should work.");
 
         let currentbucketname = bucketname(1);
         let currentround = 0;

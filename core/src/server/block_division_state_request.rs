@@ -16,6 +16,15 @@ pub(crate) struct GetStateRequest {
     division_id: String,
 }
 
+impl GetStateRequest {
+    pub fn get_user_id(&self) -> &str {
+        &self.user_id
+    }
+    pub fn get_division_id(&self) -> &str {
+        &self.division_id
+    }
+}
+
 impl BlockDivisionPost {
     pub fn get_response(
         &self,

@@ -103,6 +103,7 @@ name = "block_divider"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "db",
  "diesel",
  "dotenvy",
  "futures-util",
@@ -224,6 +225,16 @@ dependencies = [
  "darling_core",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "db"
+version = "0.1.0"
+dependencies = [
+ "diesel",
+ "futures-util",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]

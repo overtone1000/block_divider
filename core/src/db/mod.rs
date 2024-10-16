@@ -1,29 +1,10 @@
 use diesel::prelude::*;
 use dotenvy::dotenv;
 use std::env;
-use tokio::sync::mpsc::{self, Receiver, Sender};
 
 pub mod division;
+pub mod handler;
 pub mod user;
-
-pub enum DatabaseTransaction {
-    Query,
-}
-pub struct ConnectionHandler {
-    tx: Sender<DatabaseTransaction>,
-    rx: Receiver<DatabaseTransaction>,
-}
-
-impl ConnectionHandler {
-    pub fn new() -> ConnectionHandler {
-        let (tx, rx) = mpsc::channel::<DatabaseTransaction>(32);
-        ConnectionHandler { tx: tx, rx: rx }
-    }
-
-    pub fn getSender(&self) -> Sender<DatabaseTransaction> {
-        self.tx.clone()
-    }
-}
 
 pub fn establish_connection() -> PgConnection {
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");

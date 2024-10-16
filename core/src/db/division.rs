@@ -31,10 +31,17 @@ impl PersistentDivision {
         hasher.finish().to_string()
     }
 
-    fn get(conn: &mut PgConnection, basis: &BlockDivisionBasis) -> Option<PersistentDivision> {
+    pub fn get_from_basis(
+        conn: &mut PgConnection,
+        basis: &BlockDivisionBasis,
+    ) -> Option<PersistentDivision> {
         let hash = Self::get_hash(&basis);
+        Self::get_from_id(conn, &hash)
+    }
+
+    pub fn get_from_id(conn: &mut PgConnection, id: &str) -> Option<PersistentDivision> {
         let retval = divisions::table
-            .find(hash)
+            .find(id)
             .select(PersistentDivision::as_select())
             .first(conn)
             .optional()
@@ -43,7 +50,7 @@ impl PersistentDivision {
         retval
     }
 
-    fn insert(
+    pub fn insert(
         conn: &mut PgConnection,
         insertion: PersistentDivision,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -73,17 +80,10 @@ impl PersistentDivision {
     pub fn get_or_create(
         conn: &mut PgConnection,
         basis: &BlockDivisionBasis,
-        use_persistent_if_exists: bool,
     ) -> Result<BlockDivisionState, Box<dyn std::error::Error>> {
         let hash = Self::get_hash(&basis);
 
-        let resulting_persistent_division = match use_persistent_if_exists {
-            true => Self::get(conn, basis),
-            false => {
-                PersistentDivision::delete_division(conn, &hash).expect("Shouldn't panic");
-                None
-            }
-        };
+        let resulting_persistent_division = Self::get_from_basis(conn, basis);
 
         match resulting_persistent_division {
             Some(result) => {
@@ -106,7 +106,7 @@ impl PersistentDivision {
         }
     }
 
-    fn delete_division(
+    pub fn delete_division(
         conn: &mut PgConnection,
         hash: &str,
     ) -> Result<usize, diesel::result::Error> {
