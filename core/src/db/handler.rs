@@ -1,7 +1,6 @@
 use db::DatabaseTransactable;
 use diesel::PgConnection;
 
-use crate::division::block_division::BlockDivisionBasis;
 use crate::division::block_division::BlockDivisionState;
 
 use super::division::PersistentDivision;
@@ -11,6 +10,7 @@ pub enum DatabaseTransaction {
         String,
         tokio::sync::oneshot::Sender<Option<BlockDivisionState>>,
     ),
+    GetBlockDivisionList(tokio::sync::oneshot::Sender<Option<Vec<BlockDivisionState>>>),
 }
 
 impl DatabaseTransactable<PgConnection> for DatabaseTransaction {
@@ -33,6 +33,16 @@ impl DatabaseTransactable<PgConnection> for DatabaseTransaction {
                 println!("Sending response.");
                 responder
                     .send(response)
+                    .expect("Could not send to other thread.");
+            }
+            DatabaseTransaction::GetBlockDivisionList(responder) => {
+                println!("Getting list.");
+                let res = PersistentDivision::get_all(conn)
+                    .expect("Couldn't get all from persistent division table.");
+
+                println!("Sending response.");
+                responder
+                    .send(Some(res))
                     .expect("Could not send to other thread.");
             }
         }

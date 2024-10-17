@@ -61,6 +61,25 @@ impl PersistentDivision {
         }
     }
 
+    pub fn get_all(
+        conn: &mut PgConnection,
+    ) -> Result<Vec<BlockDivisionState>, Box<dyn std::error::Error>> {
+        let result = divisions::table
+            .select(PersistentDivision::as_select())
+            .load(conn);
+
+        match result {
+            Ok(result) => Ok(result
+                .iter()
+                .map(|pd| {
+                    pd.as_state()
+                        .expect("Couldn't convert persistent division to state.")
+                })
+                .collect()),
+            Err(e) => Err(Box::new(e)),
+        }
+    }
+
     pub fn insert(
         conn: &mut PgConnection,
         insertion: PersistentDivision,

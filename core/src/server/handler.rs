@@ -1,3 +1,4 @@
+use serde::Serialize;
 use std::{future::Future, pin::Pin, sync::Arc};
 use tokio::sync::mpsc::{self, Receiver, Sender};
 
@@ -17,9 +18,7 @@ use hyper_services::{
     service::stateful_service::StatefulHandler,
 };
 
-use crate::{
-    db::handler::DatabaseTransaction, server::requests::block_division_state::BlockDivisionPost,
-};
+use crate::{db::handler::DatabaseTransaction, server::requests::BlockDivisionPost};
 
 #[derive(Clone)]
 pub struct PostHandler {
@@ -65,44 +64,85 @@ impl PostHandler {
 
         println!("Handling request {}", &as_string);
 
-        let mut response = match serde_json::from_str::<BlockDivisionPost>(&as_string) {
-            Ok(request_body) => match request_body {
-                BlockDivisionPost::GetState(get_state_request) => {
-                    let (sender, receiver) = tokio::sync::oneshot::channel();
-
-                    println!("Awaiting transaction result.");
-                    let state = self
-                        .database_transaction_handler
-                        .send(DatabaseTransaction::GetBlockDivisionState(
+        let mut response = {
+            match serde_json::from_str::<BlockDivisionPost>(&as_string) {
+                Ok(request_body) => match request_body {
+                    BlockDivisionPost::GetState(get_state_request) => {
+                        let (sender, receiver) = tokio::sync::oneshot::channel();
+                        let transaction = DatabaseTransaction::GetBlockDivisionState(
                             get_state_request.get_division_id().to_string(),
                             sender,
-                        ))
-                        .await;
-
-                    match state {
-                        Ok(_) => {
-                            println!("Awaiting one shot response.");
-                            let result = receiver.await;
-                            match result {
-                                Ok(result) => match result {
-                                    Some(result) => Response::new(full_to_boxed_body(
-                                        serde_json::to_string(&result)
-                                            .expect("Couldn't serialize result"),
-                                    )),
-                                    None => generic_json_error("No such state."),
-                                },
-                                Err(err) => generic_json_error_from_debug(err),
-                            }
-                        }
-                        Err(err) => generic_json_error_from_debug(err),
+                        );
+                        database_handler_query(
+                            transaction,
+                            &mut self.database_transaction_handler,
+                            receiver,
+                        )
+                        .await
                     }
-                }
-            },
-            Err(err) => generic_json_error_from_debug(err),
+                    BlockDivisionPost::GetDivisions(_) => {
+                        let (sender, receiver) = tokio::sync::oneshot::channel();
+                        let transaction = DatabaseTransaction::GetBlockDivisionList(sender);
+                        database_handler_query(
+                            transaction,
+                            &mut self.database_transaction_handler,
+                            receiver,
+                        )
+                        .await
+                    }
+                },
+                Err(err) => generic_json_error_from_debug(err),
+            }
         };
 
         response = permit_all_cors(response);
         println!("Returning {:?}", response);
         return Ok(response);
+    }
+}
+
+async fn database_handler_query<T>(
+    transaction: DatabaseTransaction,
+    transaction_handler: &mut Sender<DatabaseTransaction>,
+    receiver: tokio::sync::oneshot::Receiver<Option<T>>,
+) -> Response<
+    http_body_util::combinators::BoxBody<
+        hyper::body::Bytes,
+        Box<dyn std::error::Error + Send + Sync>,
+    >,
+>
+where
+    T: Serialize,
+{
+    println!("Awaiting transaction result.");
+    let state = transaction_handler.send(transaction).await;
+
+    match state {
+        Ok(_) => get_oneshot_response::<T>(receiver).await,
+        Err(err) => generic_json_error_from_debug(err),
+    }
+}
+
+async fn get_oneshot_response<T>(
+    receiver: tokio::sync::oneshot::Receiver<Option<T>>,
+) -> Response<
+    http_body_util::combinators::BoxBody<
+        hyper::body::Bytes,
+        Box<dyn std::error::Error + Send + Sync>,
+    >,
+>
+where
+    T: Serialize,
+{
+    println!("Awaiting one shot response.");
+    let result = receiver.await;
+    match result {
+        Ok(result) => match result {
+            Some(result) => Response::new(full_to_boxed_body(
+                serde_json::to_string(&result).expect("Couldn't serialize result"),
+            )),
+            None => generic_json_error("No such state."),
+        },
+        Err(err) => generic_json_error_from_debug(err),
     }
 }

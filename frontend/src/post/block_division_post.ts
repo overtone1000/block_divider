@@ -1,4 +1,4 @@
-export type BlockDivisionPost = { GetState: GetState };
+export type BlockDivisionPost = { GetState: GetState } | { GetDivisions: GetDivisions };
 export type BlockDivisionPostResult = { State?: State, Error?: Error };
 
 export let block_division_post = (post: BlockDivisionPost, callback: (result: BlockDivisionPostResult) => void) => {
