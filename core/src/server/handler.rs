@@ -1,6 +1,6 @@
 use serde::Serialize;
 use std::{future::Future, pin::Pin, sync::Arc};
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 use diesel::PgConnection;
 use http_body_util::{combinators::BoxBody, BodyExt, Full};
@@ -22,7 +22,7 @@ use crate::{db::handler::DatabaseTransaction, server::requests::BlockDivisionPos
 
 #[derive(Clone)]
 pub struct PostHandler {
-    database_transaction_handler: Sender<DatabaseTransaction>,
+    database_transaction_handler: UnboundedSender<DatabaseTransaction>,
 }
 
 const BLOCK_DIVISION: &str = "/block_division_post";
@@ -53,7 +53,7 @@ impl StatefulHandler for PostHandler {
 }
 
 impl PostHandler {
-    pub fn new(database_transaction_handler: Sender<DatabaseTransaction>) -> PostHandler {
+    pub fn new(database_transaction_handler: UnboundedSender<DatabaseTransaction>) -> PostHandler {
         PostHandler {
             database_transaction_handler: database_transaction_handler,
         }
@@ -103,7 +103,7 @@ impl PostHandler {
 
 async fn database_handler_query<T>(
     transaction: DatabaseTransaction,
-    transaction_handler: &mut Sender<DatabaseTransaction>,
+    transaction_handler: &mut UnboundedSender<DatabaseTransaction>,
     receiver: tokio::sync::oneshot::Receiver<Option<T>>,
 ) -> Response<
     http_body_util::combinators::BoxBody<
@@ -115,7 +115,7 @@ where
     T: Serialize,
 {
     println!("Awaiting transaction result.");
-    let state = transaction_handler.send(transaction).await;
+    let state = transaction_handler.send(transaction);
 
     match state {
         Ok(_) => get_oneshot_response::<T>(receiver).await,

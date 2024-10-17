@@ -26,8 +26,8 @@
 				if (result.Error !== undefined) {
 					handle_error(result.Error);
 				} else {
+					console.debug(result);
 					message = JSON.stringify(result);
-					console.debug(message);
 				}
 			};
 
@@ -41,8 +41,9 @@
 				if (result.Error !== undefined) {
 					handle_error(result.Error);
 				} else {
+					let cast_result = result as StateList;
+					console.debug(cast_result);
 					message = JSON.stringify(result);
-					console.debug(message);
 				}
 			};
 
