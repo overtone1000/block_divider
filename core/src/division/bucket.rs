@@ -2,24 +2,30 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use serde::{Deserialize, Serialize};
 
-use super::{block_division::BlockDivisionBasis, participant::Participant, selections::Selection};
+use super::{
+    basis::BlockDivisionBasis, participant::ParticipantIndex, round::RoundIndex,
+    selections::Selection,
+};
 
-pub type Designations = BTreeSet<Participant>; //Map containing selected participants. Keys are rounds of the selection.
-pub type Ranks = BTreeMap<Participant, usize>;
+pub type Designations = BTreeSet<ParticipantIndex>; //Map containing selected participants. Keys are rounds of the selection.
+pub type Ranks = BTreeMap<ParticipantIndex, usize>;
 
+pub type BucketIndex = usize;
 pub type BucketName = String;
+pub type AncillaryIndex = usize;
 pub type AncillaryName = String;
 
 #[derive(Clone, Deserialize, Serialize, Hash, PartialEq, Eq, Debug)]
 pub struct BucketDef {
+    pub(crate) name: String,
     pub(crate) available_slots: usize, //How many participants can fit in this bucket in total
-    pub(crate) available_ancillaries: BTreeSet<AncillaryName>, //What ancillaries are available to an individual participant in this bucket
+    pub(crate) available_ancillaries: BTreeMap<AncillaryIndex, AncillaryName>, //What ancillaries are available to an individual participant in this bucket
 }
 
 #[derive(Deserialize, Serialize, Debug, Default, PartialEq, Eq)]
 pub struct BucketState {
     pub(crate) designations: Designations, //Who is in this bucket in each round (0 is predesignation, 1 is round 1, 2 is round 2, etc.)
-    pub(crate) ancillary_designations: BTreeMap<BucketName, Participant>,
+    pub(crate) ancillary_designations: BTreeMap<AncillaryIndex, ParticipantIndex>,
     pub(crate) ranks: Ranks, //Map containing the ranks for each participant for each potential round
 }
 
@@ -34,27 +40,31 @@ impl BucketState {
 
     pub(crate) fn get_winners(
         &self,
-        candidates: &BTreeSet<Participant>,
+        candidates: &BTreeSet<ParticipantIndex>,
         winner_count: usize,
-    ) -> BTreeSet<Participant> {
-        let mut map: BTreeMap<&usize, Participant> = BTreeMap::new(); //automatically sorted by key
+    ) -> BTreeSet<ParticipantIndex> {
+        let mut map: BTreeMap<&usize, ParticipantIndex> = BTreeMap::new(); //automatically sorted by key
         for candidate in candidates {
             let rank = self.ranks.get(candidate).expect("Should exist.");
-            map.insert(rank, candidate.to_string());
+            map.insert(rank, *candidate);
         }
 
         while map.len() as usize > winner_count {
             map.pop_last();
         }
 
-        let mut retval: BTreeSet<Participant> = BTreeSet::new();
+        let mut retval: BTreeSet<ParticipantIndex> = BTreeSet::new();
         for participant in map.values() {
-            retval.insert(participant.to_string());
+            retval.insert(*participant);
         }
         retval
     }
 
-    pub(crate) fn is_winner(&self, contender: &Participant, opponent: &Participant) -> bool {
+    pub(crate) fn is_winner(
+        &self,
+        contender: &ParticipantIndex,
+        opponent: &ParticipantIndex,
+    ) -> bool {
         if self.ranks.get(contender).expect("Should exist")
             > self.ranks.get(opponent).expect("Should exist")
         {
@@ -75,17 +85,15 @@ impl RoundStates {
         let mut retval = RoundStates {
             round_states: BTreeMap::new(),
         };
-        for round in 0..basis.selection_rounds.len() {
-            retval
-                .round_states
-                .insert(round as usize, BucketState::new());
+        for round in basis.get_selection_rounds().keys() {
+            retval.round_states.insert(*round, BucketState::new());
         }
         retval
     }
     pub fn ancillary_designation_is_available_for_this_round(
         &self,
-        round: &usize,
-        ancillary_designation: &str,
+        round: &RoundIndex,
+        ancillary_designation: &AncillaryIndex,
     ) -> bool {
         for n in 0..*round {
             let state = self.get_state(&n);
@@ -109,8 +117,8 @@ impl RoundStates {
 
     pub fn selection_result(
         &self,
-        round: &usize,
-        participant: &Participant,
+        round: &RoundIndex,
+        participant: &ParticipantIndex,
         selection: &Selection,
     ) {
         panic!("Not implemented.");
@@ -119,7 +127,7 @@ impl RoundStates {
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 pub struct BucketStates {
-    bucket_states: BTreeMap<BucketName, RoundStates>,
+    bucket_states: BTreeMap<BucketIndex, RoundStates>,
 }
 
 impl BucketStates {
@@ -127,29 +135,27 @@ impl BucketStates {
         let mut retval = BucketStates {
             bucket_states: BTreeMap::new(),
         };
-        for (bucket_name, bucket_def) in &basis.bucket_definitions {
+        for bucket_index in basis.get_bucket_definitions().keys() {
             retval
                 .bucket_states
-                .insert(bucket_name.to_string(), RoundStates::new(basis));
+                .insert(*bucket_index, RoundStates::new(basis));
         }
         retval
     }
 
-    pub fn get(&self, bucket_name: &str) -> Option<&RoundStates> {
-        self.bucket_states.get(bucket_name)
+    pub fn get(&self, bucket_index: &usize) -> Option<&RoundStates> {
+        self.bucket_states.get(bucket_index)
     }
 
-    pub fn get_mut(&mut self, bucket_name: &str) -> Option<&mut RoundStates> {
-        self.bucket_states.get_mut(bucket_name)
+    pub fn get_mut(&mut self, bucket_index: &usize) -> Option<&mut RoundStates> {
+        self.bucket_states.get_mut(bucket_index)
     }
 
-    pub fn iter(&self) -> std::collections::btree_map::Iter<'_, std::string::String, RoundStates> {
+    pub fn iter(&self) -> std::collections::btree_map::Iter<'_, usize, RoundStates> {
         self.bucket_states.iter()
     }
 
-    pub fn iter_mut(
-        &mut self,
-    ) -> std::collections::btree_map::IterMut<'_, std::string::String, RoundStates> {
+    pub fn iter_mut(&mut self) -> std::collections::btree_map::IterMut<'_, usize, RoundStates> {
         self.bucket_states.iter_mut()
     }
 }

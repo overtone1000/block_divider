@@ -7,7 +7,7 @@ use diesel::prelude::*;
 use mail::is_valid_email;
 
 use crate::{
-    division::block_division::{BlockDivisionBasis, BlockDivisionState},
+    division::{basis::BlockDivisionBasis, state::BlockDivisionState},
     schema::divisions,
 };
 
@@ -20,22 +20,11 @@ pub struct PersistentDivision {
 }
 
 impl PersistentDivision {
-    fn get_hash(basis: &BlockDivisionBasis) -> String {
-        let mut hasher = std::hash::DefaultHasher::new();
-        for (bucket_name, bucket_definition) in &basis.bucket_definitions {
-            bucket_name.hash(&mut hasher);
-            bucket_definition.hash(&mut hasher);
-        }
-        basis.participant_round_picks.hash(&mut hasher);
-        basis.selection_rounds.hash(&mut hasher);
-        hasher.finish().to_string()
-    }
-
     pub fn get_from_basis(
         conn: &mut PgConnection,
         basis: &BlockDivisionBasis,
     ) -> Option<PersistentDivision> {
-        let hash = Self::get_hash(&basis);
+        let hash = basis.get_hash();
         Self::get_from_id(conn, &hash)
     }
 
@@ -96,7 +85,7 @@ impl PersistentDivision {
         state: &BlockDivisionState,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let update = PersistentDivision {
-            hash: Self::get_hash(&state.basis),
+            hash: state.basis.get_hash(),
             serialized: serde_json::to_string(&state)?,
         };
 
@@ -116,7 +105,7 @@ impl PersistentDivision {
         conn: &mut PgConnection,
         basis: &BlockDivisionBasis,
     ) -> Result<BlockDivisionState, Box<dyn std::error::Error>> {
-        let hash = Self::get_hash(&basis);
+        let hash = basis.get_hash();
 
         let resulting_persistent_division = Self::get_from_basis(conn, basis);
 
@@ -149,7 +138,7 @@ impl PersistentDivision {
         conn: &mut PgConnection,
         basis: &BlockDivisionBasis,
     ) -> Result<usize, diesel::result::Error> {
-        let hash = Self::get_hash(basis);
+        let hash = basis.get_hash();
         Self::delete_division(conn, &hash)
     }
 }

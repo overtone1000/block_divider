@@ -3,19 +3,20 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    block_division::BlockDivisionBasis,
-    participant::{self, Participant},
+    basis::BlockDivisionBasis,
+    participant::{self, ParticipantIndex},
+    round::RoundIndex,
 };
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, PartialOrd, Ord, Clone)]
 pub struct Selection {
-    pub(crate) bucket_name: String,
-    pub(crate) ancillaries: BTreeSet<String>, //this is where Black Butte will go but opens it to other possibilities
+    pub(crate) bucket_index: usize,
+    pub(crate) ancillaries: BTreeSet<usize>, //this is where Black Butte will go but opens it to other possibilities
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Selections {
-    selections: BTreeMap<usize, BTreeMap<Participant, BTreeSet<Selection>>>,
+    selections: BTreeMap<RoundIndex, BTreeMap<ParticipantIndex, BTreeSet<Selection>>>,
 }
 
 impl Selections {
@@ -24,25 +25,30 @@ impl Selections {
             selections: BTreeMap::new(),
         };
 
-        for round in 0..basis.selection_rounds.len() {
-            let mut participant_selection_map: BTreeMap<Participant, BTreeSet<Selection>> =
+        for round in basis.get_selection_rounds().keys() {
+            let mut participant_selection_map: BTreeMap<ParticipantIndex, BTreeSet<Selection>> =
                 BTreeMap::new();
 
-            for participant in basis.participant_round_picks.keys() {
-                participant_selection_map.insert(participant.to_string(), BTreeSet::new());
+            for participant in basis.get_participant_definitions().keys() {
+                participant_selection_map.insert(*participant, BTreeSet::new());
             }
 
-            retval.selections.insert(round, participant_selection_map);
+            retval.selections.insert(*round, participant_selection_map);
         }
 
         retval
     }
 
-    pub fn get(&self, round: &usize) -> Option<&BTreeMap<Participant, BTreeSet<Selection>>> {
+    pub fn get(&self, round: &usize) -> Option<&BTreeMap<ParticipantIndex, BTreeSet<Selection>>> {
         self.selections.get(round)
     }
 
-    pub fn set(&mut self, round: usize, participant: Participant, selections: BTreeSet<Selection>) {
+    pub fn set(
+        &mut self,
+        round: usize,
+        participant: ParticipantIndex,
+        selections: BTreeSet<Selection>,
+    ) {
         let round_selections = match self.selections.entry(round) {
             std::collections::btree_map::Entry::Vacant(entry) => entry.insert(BTreeMap::new()),
             std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),

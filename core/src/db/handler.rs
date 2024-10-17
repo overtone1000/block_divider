@@ -1,7 +1,7 @@
 use db::DatabaseTransactable;
 use diesel::PgConnection;
 
-use crate::division::block_division::BlockDivisionState;
+use crate::division::state::BlockDivisionState;
 
 use super::division::PersistentDivision;
 
