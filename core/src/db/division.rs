@@ -112,4 +112,12 @@ impl PersistentDivision {
     ) -> Result<usize, diesel::result::Error> {
         diesel::delete(divisions::table.find(hash)).execute(conn)
     }
+
+    pub fn delete_division_from_basis(
+        conn: &mut PgConnection,
+        basis: &BlockDivisionBasis,
+    ) -> Result<usize, diesel::result::Error> {
+        let hash = Self::get_hash(basis);
+        Self::delete_division(conn, &hash)
+    }
 }

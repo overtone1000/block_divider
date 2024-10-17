@@ -359,12 +359,12 @@ mod tests {
         let mut conn = establish_connection();
         let basis = create_basis();
 
-        PersistentDivision::delete_division(&mut conn, &basis); //Delete any remnant, result doesn't matter
+        PersistentDivision::delete_division_from_basis(&mut conn, &basis); //Delete any remnant, result doesn't matter
 
         PersistentDivision::get_or_create(&mut conn, &basis) //create to test overwriting
             .expect("Should work.");
         let delete_count =
-            PersistentDivision::delete_division(&mut conn, &basis).expect("Should work"); //Delete just created, should have a result
+            PersistentDivision::delete_division_from_basis(&mut conn, &basis).expect("Should work"); //Delete just created, should have a result
         assert!(delete_count == 1);
 
         let bds = PersistentDivision::get_or_create(&mut conn, &basis) //recreate to test ignoring
@@ -392,7 +392,7 @@ mod tests {
         let mut conn = establish_connection();
         let basis = create_basis();
 
-        PersistentDivision::delete(&mut conn, &basis); //Delete any remnant
+        PersistentDivision::delete_division_from_basis(&mut conn, &basis); //Delete any remnant
         let mut bds = PersistentDivision::get_or_create(&mut conn, &basis).expect("Should work.");
 
         let currentbucketname = bucketname(1);
