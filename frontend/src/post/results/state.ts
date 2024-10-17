@@ -4,11 +4,12 @@ interface BucketDefinition {
     available_ancillaries: [string],
 }
 
-type SelectionIndex = number;
+type SelectionIndex = number; //index in Basis.bucket_definitions
 type SelectedParticipant = number; //index in Basis.participant_round_picks
+type RoundIndex = number; //index in Basis.selection_rounds
 
 interface Picks {
-    [round_index: number]: SelectionIndex
+    [round_index: RoundIndex]: SelectionIndex
 }
 
 interface Basis {
@@ -18,17 +19,20 @@ interface Basis {
 }
 
 interface RoundState {
-    ancillary_designations: { [ancillary_name: string]: number }
+    ancillary_designations: { [ancillary_name: string]: SelectedParticipant }
+    designations:
+    ranks:
 }
 
 interface BucketState {
-    round_states: { [round_index: number]: RoundState }
+    round_states: { [round_index: RoundIndex]: RoundState }
 }
 
 interface State {
     basis: Basis,
-    bucket_states: { [bucket_name: string]: BucketState }
-
+    bucket_states: { [bucket_name: string]: BucketState },
+    current_open_round: RoundIndex,
+    selections: { [round_index: RoundIndex] }
 }
 
 type StateList = [State]
