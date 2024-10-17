@@ -1,34 +1,35 @@
 <script lang="ts">
 	import Container from "./container.svelte";
 	import { onMount } from "svelte";
+	import { block_division_post } from "../post/block_division_post";
+	import type { BlockDivisionPost, BlockDivisionPostResult } from "../post/block_division_post";
 
 	let data: undefined | string = "Loading";
 
-	let get_state = () => {
-		/*
-		Test URL
-		http://localhost:5173/block_division?user_id=test_user&division_id=test_division_id
-		*/
+	onMount(async () => {
 		const urlParams = new URLSearchParams(window.location.search);
 		console.debug(urlParams);
 		let user_id = urlParams.get("user_id");
 		let division_id = urlParams.get("division_id");
 
-		fetch("http://localhost:8181/block_division_state", {
-			method: "POST",
-			body: JSON.stringify({
-				user_id: user_id,
-				division_id: division_id
-			})
-		}).then((result) => {
-			result.json().then((json) => {
-				data = json;
-			});
-		});
-	};
+		if (user_id !== null && division_id !== null) {
+			let post: BlockDivisionPost = {
+				GetState: {
+					user_id: user_id,
+					division_id: division_id
+				}
+			};
 
-	onMount(async () => {
-		get_state();
+			let callback = (result: BlockDivisionPostResult) => {
+				if (result.Error !== undefined) {
+				} else {
+					data = JSON.stringify(result);
+					console.debug(data);
+				}
+			};
+
+			block_division_post(post, callback);
+		}
 	});
 </script>
 

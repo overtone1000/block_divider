@@ -50,6 +50,17 @@ impl PersistentDivision {
         retval
     }
 
+    pub fn get_state_from_id(
+        conn: &mut PgConnection,
+        id: &str,
+    ) -> Result<Option<BlockDivisionState>, Box<dyn std::error::Error>> {
+        let pd = PersistentDivision::get_from_id(conn, id);
+        match pd {
+            Some(pd) => Ok(Some(pd.as_state()?)),
+            None => Ok(None),
+        }
+    }
+
     pub fn insert(
         conn: &mut PgConnection,
         insertion: PersistentDivision,
@@ -77,6 +88,11 @@ impl PersistentDivision {
         Ok(())
     }
 
+    fn as_state(&self) -> Result<BlockDivisionState, Box<dyn std::error::Error>> {
+        let str = self.serialized.as_str();
+        Ok(serde_json::from_str(str)?)
+    }
+
     pub fn get_or_create(
         conn: &mut PgConnection,
         basis: &BlockDivisionBasis,
@@ -86,10 +102,7 @@ impl PersistentDivision {
         let resulting_persistent_division = Self::get_from_basis(conn, basis);
 
         match resulting_persistent_division {
-            Some(result) => {
-                let str = result.serialized.as_str();
-                Ok(serde_json::from_str(str)?)
-            }
+            Some(result) => result.as_state(),
             None => {
                 let retval = BlockDivisionState::new(basis);
 

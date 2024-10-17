@@ -7,30 +7,33 @@ use crate::division::block_division::BlockDivisionState;
 use super::division::PersistentDivision;
 
 pub enum DatabaseTransaction {
-    PersistentDivision_Get(String),
-    PersistentDivision_Insert(PersistentDivision),
-    PersistentDivision_Update(BlockDivisionState),
-    PersistentDivision_GetOrCreate(BlockDivisionBasis),
-    PersistentDivision_Delete(String),
+    GetBlockDivisionState(
+        String,
+        tokio::sync::oneshot::Sender<Option<BlockDivisionState>>,
+    ),
 }
 
 impl DatabaseTransactable<PgConnection> for DatabaseTransaction {
-    fn handle(&self, conn: &mut PgConnection) {
+    fn handle(self: Self, conn: &mut PgConnection) {
+        println!("Handling database transaction.");
+
         match self {
-            DatabaseTransaction::PersistentDivision_Get(basis) => {
-                PersistentDivision::get_from_id(conn, basis);
-            }
-            DatabaseTransaction::PersistentDivision_Insert(division) => {
-                PersistentDivision::insert(conn, division.clone());
-            }
-            DatabaseTransaction::PersistentDivision_Update(state) => {
-                PersistentDivision::update(conn, state);
-            }
-            DatabaseTransaction::PersistentDivision_GetOrCreate(basis) => {
-                PersistentDivision::get_or_create(conn, basis);
-            }
-            DatabaseTransaction::PersistentDivision_Delete(hash) => {
-                PersistentDivision::delete_division(conn, hash);
+            DatabaseTransaction::GetBlockDivisionState(basis, responder) => {
+                println!("Getting state.");
+                let res = PersistentDivision::get_state_from_id(conn, &basis);
+
+                let response = match res {
+                    Ok(res) => res,
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        None
+                    }
+                };
+
+                println!("Sending response.");
+                responder
+                    .send(response)
+                    .expect("Could not send to other thread.");
             }
         }
     }
