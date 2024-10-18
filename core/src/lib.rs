@@ -21,7 +21,7 @@ const PORT: u16 = 8181;
 pub async fn tokio_serve<'a>() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("Starting database transaction handler");
     let mut db_handler: AsyncDatabaseTransactionHandler<DatabaseTransaction, PgConnection> =
-        AsyncDatabaseTransactionHandler::new(establish_connection());
+        AsyncDatabaseTransactionHandler::new(establish_connection);
 
     println!("Building server");
     let service = PostHandler::new(db_handler.get_sender());

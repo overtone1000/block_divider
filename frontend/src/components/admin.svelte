@@ -3,10 +3,11 @@
 	import { onMount } from "svelte";
 	import { block_division_post } from "../post/block_division_post";
 	import type { BlockDivisionPost, BlockDivisionPostResult } from "../post/block_division_post";
+	import BlockDivisionEdit from "./block_division_edit/block_division_edit.svelte";
 
 	let message = "Loading...";
 	let list: BlockDivisionStateList | undefined = undefined;
-	let division_id: string | undefined = undefined;
+	let selected_division: [string, BlockDivisionState] | undefined = undefined;
 
 	enum DisplayMode {
 		Loading,
@@ -23,10 +24,6 @@
 	};
 
 	onMount(async () => {
-		if (division_id !== undefined) {
-			display_mode = DisplayMode.Modify;
-		}
-
 		let post: BlockDivisionPost = {
 			GetDivisions: {}
 		};
@@ -44,6 +41,12 @@
 
 		block_division_post(post, callback);
 	});
+
+	$: {
+		if (selected_division !== undefined) {
+			display_mode = DisplayMode.Modify;
+		}
+	}
 </script>
 
 <Container title="Block Division Administration">
@@ -54,8 +57,10 @@
 			<div>
 				{#each list as block_division_item}
 					<a
-						onclick={() => {
-							division_id = block_division_item[0];
+						href={window.location.href}
+						on:click={() => {
+							selected_division = block_division_item;
+							return false;
 						}}
 					>
 						{block_division_item[1].basis.label}
@@ -64,8 +69,10 @@
 			</div>
 		{:else if display_mode == DisplayMode.Create}
 			<div></div>
-		{:else if display_mode == DisplayMode.Modify}
-			<div></div>
+		{:else if display_mode == DisplayMode.Modify && selected_division !== undefined}
+			<div>
+				<BlockDivisionEdit block_division_tuple={selected_division} />
+			</div>
 		{:else}
 			<div>Error</div>
 		{/if}
