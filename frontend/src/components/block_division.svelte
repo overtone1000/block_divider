@@ -8,11 +8,13 @@
 
 	let handle_error = (e: Error) => {
 		message = "Error (see developer console)";
-		console.error(message);
+		console.error(e);
 	};
 
 	onMount(async () => {
 		const urlParams = new URLSearchParams(window.location.search);
+
+		//Example: localhost:5173/block_division?user_id=test_user_id&division_id=test_division_id
 		console.debug(urlParams);
 		let user_id = urlParams.get("user_id");
 		let division_id = urlParams.get("division_id");
@@ -25,8 +27,8 @@
 			};
 
 			let callback = (result: BlockDivisionPostResult) => {
-				if (result.Error !== undefined) {
-					handle_error(result.Error);
+				if (result.error !== undefined) {
+					handle_error(result.error);
 				} else {
 					message = JSON.stringify(result);
 					console.debug(message);

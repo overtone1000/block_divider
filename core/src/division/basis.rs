@@ -13,6 +13,7 @@ use super::{
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct BlockDivisionBasis {
+    label: String,
     bucket_definitions: BTreeMap<BucketIndex, BucketDef>,
     participant_definitions: BTreeMap<ParticipantIndex, ParticipantDef>,
     selection_round_names: BTreeMap<RoundIndex, RoundName>,
@@ -20,15 +21,21 @@ pub struct BlockDivisionBasis {
 
 impl BlockDivisionBasis {
     pub fn create(
+        label: String,
         bucket_definitions: BTreeMap<BucketIndex, BucketDef>,
         participant_definitions: BTreeMap<ParticipantIndex, ParticipantDef>,
         selection_round_names: BTreeMap<RoundIndex, RoundName>,
     ) -> BlockDivisionBasis {
         BlockDivisionBasis {
+            label: label,
             bucket_definitions: bucket_definitions,
             participant_definitions: participant_definitions,
             selection_round_names: selection_round_names,
         }
+    }
+
+    pub fn get_label(&self) -> &str {
+        &self.label
     }
 
     pub fn get_selection_rounds(&self) -> &BTreeMap<RoundIndex, RoundName> {

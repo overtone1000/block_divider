@@ -50,21 +50,30 @@ impl PersistentDivision {
         }
     }
 
+    //Returns a vector of tuples containing (Hash,BlockDivisionState)
     pub fn get_all(
         conn: &mut PgConnection,
-    ) -> Result<Vec<BlockDivisionState>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<(String, BlockDivisionState)>, Box<dyn std::error::Error>> {
         let result = divisions::table
             .select(PersistentDivision::as_select())
             .load(conn);
 
         match result {
-            Ok(result) => Ok(result
-                .iter()
-                .map(|pd| {
-                    pd.as_state()
-                        .expect("Couldn't convert persistent division to state.")
-                })
-                .collect()),
+            Ok(result) => {
+                let mut vec = result
+                    .iter()
+                    .map(|pd| {
+                        (
+                            pd.hash.clone(),
+                            pd.as_state()
+                                .expect("Couldn't convert persistent division to state."),
+                        )
+                    })
+                    .collect::<Vec<(String, BlockDivisionState)>>();
+                vec.sort_by(|a, b| a.1.basis.get_label().cmp(b.1.basis.get_label()));
+
+                Ok(vec)
+            }
             Err(e) => Err(Box::new(e)),
         }
     }

@@ -44,9 +44,14 @@ pub struct BlockDivisionInput {
 
 impl BlockDivisionState {
     pub fn new(basis: &BlockDivisionBasis) -> BlockDivisionState {
+        let mut bucket_states: BucketStates = BTreeMap::new();
+        for bucket_index in basis.get_bucket_definitions().keys() {
+            bucket_states.insert(*bucket_index, RoundStates::new(basis));
+        }
+
         let mut retval = BlockDivisionState {
             basis: basis.clone(),
-            bucket_states: BucketStates::new(basis),
+            bucket_states: bucket_states,
             selections: Selections::new(basis),
             current_open_round: None,
         };
@@ -141,8 +146,8 @@ impl BlockDivisionState {
     fn generate_ranks(&mut self) {
         let mut initial_available_ranks: BTreeSet<usize> = BTreeSet::new();
 
-        for n in self.basis.get_participant_definitions().keys() {
-            initial_available_ranks.insert(*n);
+        for n in 1..self.basis.get_participant_definitions().len() + 1 {
+            initial_available_ranks.insert(n);
         }
 
         let mut rng: ThreadRng = thread_rng();
@@ -401,7 +406,12 @@ mod tests {
             );
         }
 
-        BlockDivisionBasis::create(buckets, participants, rounds)
+        BlockDivisionBasis::create(
+            "Test Block Division".to_string(),
+            buckets,
+            participants,
+            rounds,
+        )
     }
 
     #[test]

@@ -10,7 +10,7 @@ pub enum DatabaseTransaction {
         String,
         tokio::sync::oneshot::Sender<Option<BlockDivisionState>>,
     ),
-    GetBlockDivisionList(tokio::sync::oneshot::Sender<Option<Vec<BlockDivisionState>>>),
+    GetBlockDivisionList(tokio::sync::oneshot::Sender<Option<Vec<(String, BlockDivisionState)>>>),
 }
 
 impl DatabaseTransactable<PgConnection> for DatabaseTransaction {

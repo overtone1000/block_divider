@@ -129,37 +129,4 @@ impl RoundStates {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
-pub struct BucketStates {
-    bucket_states: BTreeMap<BucketIndex, RoundStates>,
-}
-
-impl BucketStates {
-    pub fn new(basis: &BlockDivisionBasis) -> BucketStates {
-        let mut retval = BucketStates {
-            bucket_states: BTreeMap::new(),
-        };
-        for bucket_index in basis.get_bucket_definitions().keys() {
-            retval
-                .bucket_states
-                .insert(*bucket_index, RoundStates::new(basis));
-        }
-        retval
-    }
-
-    pub fn get(&self, bucket_index: &usize) -> Option<&RoundStates> {
-        self.bucket_states.get(bucket_index)
-    }
-
-    pub fn get_mut(&mut self, bucket_index: &usize) -> Option<&mut RoundStates> {
-        self.bucket_states.get_mut(bucket_index)
-    }
-
-    pub fn iter(&self) -> std::collections::btree_map::Iter<'_, usize, RoundStates> {
-        self.bucket_states.iter()
-    }
-
-    pub fn iter_mut(&mut self) -> std::collections::btree_map::IterMut<'_, usize, RoundStates> {
-        self.bucket_states.iter_mut()
-    }
-}
+pub type BucketStates = BTreeMap<BucketIndex, RoundStates>;

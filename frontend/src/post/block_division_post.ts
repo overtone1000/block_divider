@@ -1,5 +1,5 @@
 export type BlockDivisionPost = { GetState: GetState } | { GetDivisions: GetDivisions };
-export type BlockDivisionPostResult = { State?: State, Error?: Error };
+export type BlockDivisionPostResult = { State?: BlockDivisionState, error?: Error };
 
 export let block_division_post = (post: BlockDivisionPost, callback: (result: BlockDivisionPostResult) => void) => {
     fetch("http://localhost:8181/block_division_post", {
