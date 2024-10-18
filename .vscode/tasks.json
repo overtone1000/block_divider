@@ -29,6 +29,15 @@
             "options": {
                 "cwd": "${workspaceFolder}/core"
             },
-        }
+        },
+        {
+            "label": "Core - Tests",
+            "type": "shell",
+            "command": "cargo test --manifest-path ${workspaceFolder}/core/Cargo.toml -- --show-output --test-threads=1", //Need to use only one thread because of database conflicts.
+            "group": "build",
+            "options": {
+                "cwd": "${workspaceFolder}/core"
+            },
+        },
     ]
 }

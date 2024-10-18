@@ -7,7 +7,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug Block Divider Core",
+            "name": "Core - Debug",
             "cwd": "${workspaceFolder}/core",
             "cargo": {
                 "args": [
@@ -16,6 +16,6 @@
                     "${workspaceFolder}/core/Cargo.toml"
                 ]
             },
-        }
+        },
     ]
 }

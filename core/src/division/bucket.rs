@@ -90,12 +90,16 @@ impl RoundStates {
         }
         retval
     }
+
     pub fn ancillary_designation_is_available_for_this_round(
         &self,
         round: &RoundIndex,
         ancillary_designation: &AncillaryIndex,
     ) -> bool {
-        for n in 0..*round {
+        for n in self.round_states.keys() {
+            if n == round {
+                break;
+            }
             let state = self.get_state(&n);
             if state
                 .ancillary_designations

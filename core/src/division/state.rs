@@ -1,3 +1,4 @@
+use chrono::round;
 use diesel::PgConnection;
 use rand::prelude::*;
 
@@ -29,7 +30,7 @@ pub struct BlockDivisionState {
     pub basis: BlockDivisionBasis,
     pub bucket_states: BucketStates,
     pub selections: Selections,
-    pub current_open_round: usize,
+    pub current_open_round: Option<RoundIndex>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -47,16 +48,12 @@ impl BlockDivisionState {
             basis: basis.clone(),
             bucket_states: BucketStates::new(basis),
             selections: Selections::new(basis),
-            current_open_round: 0,
+            current_open_round: None,
         };
 
         retval.generate_ranks(); //Only generate ranks here. This should only happen once per basis.
 
         retval
-    }
-
-    fn round_count(&self) -> usize {
-        self.basis.get_selection_rounds().len() as usize
     }
 
     pub fn input_selection(
@@ -65,43 +62,63 @@ impl BlockDivisionState {
         participant_index: ParticipantIndex,
         selections: BTreeSet<Selection>,
         round: usize,
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let pick_count = self
             .basis
             .get_participant_definitions()
             .get(&participant_index)
-            .expect("Should exist.")
+            .expect("Participant should exist.")
             .get_round_picks_allowed()
             .get(&round)
-            .expect("Should exist.");
+            .expect("Round should exist.");
 
-        if selections.len() > (*pick_count as usize) {
-            eprintln!(
-                "Incorrect number of picks for {}. Ignoring selection input.",
-                participant_index
-            )
-        } else if round != self.current_open_round {
-            eprintln!(
-                "Incorrect round {}. Open round is {}. Ignoring selection input.",
-                round, self.current_open_round
-            );
-        } else {
-            self.selections.set(round, participant_index, selections);
-            self.determine_designations_from_current_selections();
-            self.save_state(conn);
+        match self.current_open_round {
+            Some(current_open_round) => {
+                if selections.len() > (*pick_count as usize) {
+                    Err(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        format!(
+                            "Incorrect number of picks for {}. Ignoring selection input.",
+                            participant_index
+                        ),
+                    )))
+                } else if round != current_open_round {
+                    Err(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        format!(
+                            "Incorrect round {}. Open round is {}. Ignoring selection input.",
+                            round, current_open_round
+                        ),
+                    )))
+                } else {
+                    self.selections.set(round, participant_index, selections);
+                    self.determine_designations_from_current_selections();
+                    match self.save_state(conn) {
+                        Ok(_) => Ok(()),
+                        Err(_) => Err(Box::new(std::io::Error::new(
+                            std::io::ErrorKind::InvalidInput,
+                            format!("Couldn't save state."),
+                        ))),
+                    }
+                }
+            }
+            None => Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("Selections are closed."),
+            ))),
         }
     }
 
     fn determine_designations_from_current_selections(&mut self) {
         let mut selections_to_attempt: Vec<(usize, ParticipantIndex, Selection)> = Vec::new();
 
-        for round in 0..self.round_count() {
+        for round in self.basis.get_selection_rounds().keys() {
             match self.selections.get(&round) {
                 Some(participant_selections_map) => {
                     for (participant, selections) in participant_selections_map {
                         for selection in selections.iter() {
                             selections_to_attempt.push((
-                                round,
+                                *round,
                                 participant.clone(),
                                 selection.clone(),
                             ));
@@ -122,17 +139,19 @@ impl BlockDivisionState {
     }
 
     fn generate_ranks(&mut self) {
-        let participant_count = self.basis.get_participant_definitions().len() as usize;
         let mut initial_available_ranks: BTreeSet<usize> = BTreeSet::new();
 
-        for n in 0..participant_count {
-            initial_available_ranks.insert(n);
+        for n in self.basis.get_participant_definitions().keys() {
+            initial_available_ranks.insert(*n);
         }
 
         let mut rng: ThreadRng = thread_rng();
 
-        println!("Iterating through {} rounds.", self.round_count());
-        for round in 0..self.round_count() {
+        println!(
+            "Iterating through {} rounds.",
+            self.basis.get_selection_rounds().keys().len()
+        );
+        for round in self.basis.get_selection_rounds().keys() {
             println!("Round {}", round);
             for (_bucket_name, bucket) in self.bucket_states.iter_mut() {
                 let mut bucket_state_this_round: BTreeMap<ParticipantIndex, usize> =
@@ -203,7 +222,7 @@ impl BlockDivisionState {
 
     fn slots_available_this_round(&self, bucket_index: &usize, round: &usize) -> usize {
         let mut used_slots: usize = 0;
-        for current_round in 0..*round {
+        for current_round in self.basis.get_selection_rounds().keys() {
             used_slots += self
                 .bucket_states
                 .get(bucket_index)
@@ -290,6 +309,35 @@ impl BlockDivisionState {
             false
         }
     }
+
+    pub fn set_open_round(
+        &mut self,
+        round_index: Option<usize>,
+        conn: &mut PgConnection,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        match round_index {
+            Some(round_index) => {
+                let mut contains_key = false;
+                for key in self.basis.get_selection_rounds().keys() {
+                    if key == &round_index {
+                        self.current_open_round = Some(round_index);
+                        contains_key = true;
+                        break;
+                    }
+                }
+                if !contains_key {
+                    return Err(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        format!("Invalid round index {}.", round_index),
+                    )));
+                }
+            }
+            None => {}
+        };
+
+        self.current_open_round = round_index;
+        self.save_state(conn)
+    }
 }
 
 #[cfg(test)]
@@ -306,17 +354,21 @@ mod tests {
     const PARTICIPANT_B: (usize, &str) = (18, "Participant A");
     const PARTICIPANT_C: (usize, &str) = (47, "Participant A");
     const BLACK_BUTTE: (usize, &str) = (5, "Black Butte");
-    const NUMBER_OF_BUCKETS: usize = 4;
+    const BUCKET_INDICES: [usize; 6] = [1, 5, 18, 2, 7, 77];
+
+    const ROUND_1: (usize, &str) = (2, "Predesignation");
+    const ROUND_2: (usize, &str) = (6, "Round 1");
+    const ROUND_3: (usize, &str) = (988, "Round 2");
+    const ROUND_4: (usize, &str) = (5, "Round 3");
 
     fn bucketname(i: usize) -> String {
-        assert!(i >= 1 && i <= NUMBER_OF_BUCKETS);
         "Bucket ".to_string() + &i.to_string()
     }
 
     fn create_basis() -> BlockDivisionBasis {
         let mut buckets: BTreeMap<BucketIndex, BucketDef> = BTreeMap::new();
 
-        for n in 1..NUMBER_OF_BUCKETS + 1 {
+        for n in BUCKET_INDICES {
             buckets.insert(
                 n,
                 BucketDef {
@@ -328,16 +380,16 @@ mod tests {
         }
 
         let rounds: BTreeMap<RoundIndex, RoundName> = BTreeMap::from([
-            (1, "Predesignation".to_string()),
-            (2, "Round 1".to_string()),
-            (3, "Round 2".to_string()),
-            (4, "Round 3".to_string()),
+            (ROUND_1.0, ROUND_1.1.to_string()),
+            (ROUND_2.0, ROUND_2.1.to_string()),
+            (ROUND_3.0, ROUND_3.1.to_string()),
+            (ROUND_4.0, ROUND_4.1.to_string()),
         ]);
 
         let mut round_picks: BTreeMap<RoundIndex, u64> = BTreeMap::new();
         round_picks.insert(0, 3);
-        for n in 1..rounds.len() as RoundIndex {
-            round_picks.insert(n, 1);
+        for n in rounds.keys() {
+            round_picks.insert(*n, 1);
         }
 
         let mut participants: BTreeMap<ParticipantIndex, ParticipantDef> = BTreeMap::new();
@@ -358,7 +410,11 @@ mod tests {
         let mut conn = establish_connection();
         let basis = create_basis();
 
-        PersistentDivision::delete_division_from_basis(&mut conn, &basis); //Delete any remnant, result doesn't matter
+        match PersistentDivision::delete_division_from_basis(&mut conn, &basis) //Delete any remnant
+        {
+            Ok(_)=>{},
+            Err(_)=>{println!("Couldn't delete, but this may not be an error.");}
+        };
 
         PersistentDivision::get_or_create(&mut conn, &basis) //create to test overwriting
             .expect("Should work.");
@@ -391,26 +447,47 @@ mod tests {
         let mut conn = establish_connection();
         let basis = create_basis();
 
-        PersistentDivision::delete_division_from_basis(&mut conn, &basis); //Delete any remnant
+        match PersistentDivision::delete_division_from_basis(&mut conn, &basis) //Delete any remnant
+        {
+            Ok(_)=>{},
+            Err(_)=>{println!("Couldn't delete, but this may not be an error.");}
+        }
         let mut bds = PersistentDivision::get_or_create(&mut conn, &basis).expect("Should work.");
 
-        let bucket_index: BucketIndex = 0;
-        let participant_index: usize = 0;
-        let ancillary_index: usize = 0;
+        let participant_index = PARTICIPANT_A.0;
 
-        let currentbucketname = bucketname(1);
-        let currentround = 0;
+        let current_bucket_index = basis
+            .get_bucket_definitions()
+            .keys()
+            .next()
+            .expect("Should have a first value.");
+        let currentbucketname = bucketname(*current_bucket_index);
+
+        let current_round_index = basis
+            .get_selection_rounds()
+            .keys()
+            .next()
+            .expect("Should have a first value.");
 
         let mut selections_a: BTreeSet<Selection> = BTreeSet::new();
         let mut ancillaries_a: BTreeSet<AncillaryIndex> = BTreeSet::new();
-        ancillaries_a.insert(ancillary_index);
+        ancillaries_a.insert(BLACK_BUTTE.0);
 
         selections_a.insert(Selection {
-            bucket_index: bucket_index,
+            bucket_index: *current_bucket_index,
             ancillaries: ancillaries_a,
         });
 
-        bds.input_selection(&mut conn, 0, selections_a, currentround);
+        bds.set_open_round(Some(*current_round_index), &mut conn)
+            .expect("Couldn't set open round.");
+
+        bds.input_selection(
+            &mut conn,
+            participant_index,
+            selections_a,
+            *current_round_index,
+        )
+        .expect("Should be able to input selection.");
         bds.determine_designations_from_current_selections();
 
         /*
@@ -423,9 +500,9 @@ mod tests {
 
         let pertinent_designations = &bds
             .bucket_states
-            .get(&1)
+            .get(current_bucket_index)
             .expect("Should exist.")
-            .get_state(&currentround)
+            .get_state(current_round_index)
             .designations;
 
         let correctly_assigned = pertinent_designations.contains(&participant_index);
@@ -433,7 +510,7 @@ mod tests {
         if !correctly_assigned {
             eprintln!(
                 "Assignment failed. Designations for bucket {} and round {} are {:?}",
-                currentbucketname, currentround, pertinent_designations
+                currentbucketname, current_round_index, pertinent_designations
             );
         }
         assert!(correctly_assigned);
