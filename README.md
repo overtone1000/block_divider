@@ -7,6 +7,12 @@ A tool to process vacation request and perform minimal necessary arbitration wit
     - On Ubuntu, this required `sudo apt install libpq-dev` not just `sudo apt install libpq`
 - Secrets are handled with environment files and are in `./core/.env` which is excluded from the git repo for security. This file will need to be populated.
 
+`diesel migration generate $MIGRATION_NAME`
+`diesel migration run`
+`diesel migration redo`
+`diesel migration redo -a`
+
+
 ## Local Dependencies
 The core is dependent on some local external rust libraries. See `core/Cargo.toml` which shows the relative path where those libraries need to be placed.
 
