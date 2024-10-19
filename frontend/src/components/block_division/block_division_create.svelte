@@ -1,6 +1,5 @@
 <script lang="ts">
 	import Textfield from "@smui/textfield";
-	import Select, { Option } from "@smui/select";
 
 	export let block_division_tuple: [string, BlockDivisionState];
 
@@ -16,18 +15,10 @@
 		[ ] block_division.basis.selection_round_names;
 		[x]	block_division.current_open_round;
 	*/
-
-	let round_keys = Object.keys(block_division.basis.selection_round_names) as unknown as number[];
 </script>
 
-<div>
+<div class="columns margins" style="justify-content: flex-start;">
 	<Textfield label="Label" bind:value={block_division.basis.label} />
-
-	<Select bind:value={block_division.current_open_round} label="Current Open Round">
-		{#each round_keys as round_key}
-			<Option value={round_key}>{block_division.basis.selection_round_names[round_key]}</Option>
-		{/each}
-	</Select>
 </div>
 
 <style>

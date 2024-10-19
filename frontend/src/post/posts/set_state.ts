@@ -1,0 +1,3 @@
+interface SetState {
+    state: BlockDivisionState
+}

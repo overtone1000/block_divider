@@ -1,15 +1,14 @@
 <script lang="ts">
 	import Container from "./container.svelte";
 	import { onMount } from "svelte";
-	import { block_division_post } from "../post/block_division_post";
-	import type { BlockDivisionPost, BlockDivisionPostResult } from "../post/block_division_post";
+	import {
+		block_division_post,
+		type BlockDivisionPost,
+		type BlockDivisionPostResult
+	} from "../post/block_division_post";
+	import { handle_error } from "../commons/commons";
 
 	let message: string = "Loading";
-
-	let handle_error = (e: Error) => {
-		message = "Error (see developer console)";
-		console.error(e);
-	};
 
 	onMount(async () => {
 		const urlParams = new URLSearchParams(window.location.search);
@@ -27,11 +26,13 @@
 			};
 
 			let callback = (result: BlockDivisionPostResult) => {
-				if (result.error !== undefined) {
-					handle_error(result.error);
-				} else {
-					message = JSON.stringify(result);
-					console.debug(message);
+				if (typeof result === "object") {
+					if (result.error !== undefined) {
+						handle_error(result.error);
+					} else {
+						message = JSON.stringify(result);
+						console.debug(message);
+					}
 				}
 			};
 

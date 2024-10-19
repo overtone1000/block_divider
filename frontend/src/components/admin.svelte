@@ -1,20 +1,17 @@
 <script lang="ts">
 	import Container from "./container.svelte";
 	import { onMount } from "svelte";
-	import { block_division_post } from "../post/block_division_post";
-	import type { BlockDivisionPost, BlockDivisionPostResult } from "../post/block_division_post";
-	import BlockDivisionEdit from "./block_division_edit/block_division_edit.svelte";
+	import {
+		block_division_post,
+		type BlockDivisionPost,
+		type BlockDivisionPostResult
+	} from "../post/block_division_post";
+	import BlockDivisionEdit from "./block_division/block_division_edit.svelte";
+	import { DisplayMode } from "../commons/commons";
 
 	let message = "Loading...";
 	let list: BlockDivisionStateList | undefined = undefined;
 	let selected_division: [string, BlockDivisionState] | undefined = undefined;
-
-	enum DisplayMode {
-		Loading,
-		List,
-		Create,
-		Modify
-	}
 
 	let display_mode: DisplayMode = DisplayMode.Loading;
 
@@ -23,19 +20,25 @@
 		console.error(e);
 	};
 
+	let set_display_mode = (m: DisplayMode) => {
+		display_mode = m;
+	};
+
 	onMount(async () => {
 		let post: BlockDivisionPost = {
 			GetDivisions: {}
 		};
 
 		let callback = (result: BlockDivisionPostResult) => {
-			if (result.error !== undefined) {
-				handle_error(result.error);
-			} else {
-				let cast_result = result as BlockDivisionStateList;
-				console.debug(cast_result);
-				list = cast_result;
-				display_mode = DisplayMode.List;
+			if (typeof result === "object") {
+				if (result.error !== undefined) {
+					handle_error(result.error);
+				} else {
+					let cast_result = result as BlockDivisionStateList;
+					console.debug(cast_result);
+					list = cast_result;
+					display_mode = DisplayMode.List;
+				}
 			}
 		};
 
@@ -71,7 +74,7 @@
 			<div></div>
 		{:else if display_mode == DisplayMode.Modify && selected_division !== undefined}
 			<div>
-				<BlockDivisionEdit block_division_tuple={selected_division} />
+				<BlockDivisionEdit {set_display_mode} block_division_tuple={selected_division} />
 			</div>
 		{:else}
 			<div>Error</div>

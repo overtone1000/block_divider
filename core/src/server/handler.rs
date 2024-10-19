@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::{future::Future, pin::Pin, sync::Arc};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
-use diesel::PgConnection;
+use diesel::{IntoSql, PgConnection};
 use http_body_util::{combinators::BoxBody, BodyExt, Full};
 use hyper::{
     body::{Bytes, Frame, Incoming},
@@ -83,6 +83,17 @@ impl PostHandler {
                     BlockDivisionPost::GetDivisions(_) => {
                         let (sender, receiver) = tokio::sync::oneshot::channel();
                         let transaction = DatabaseTransaction::GetBlockDivisionList(sender);
+                        database_handler_query(
+                            transaction,
+                            &mut self.database_transaction_handler,
+                            receiver,
+                        )
+                        .await
+                    }
+                    BlockDivisionPost::SetState(set_state_request) => {
+                        let (sender, receiver) = tokio::sync::oneshot::channel();
+                        let transaction =
+                            DatabaseTransaction::SetBlockDivisionState(set_state_request, sender);
                         database_handler_query(
                             transaction,
                             &mut self.database_transaction_handler,
