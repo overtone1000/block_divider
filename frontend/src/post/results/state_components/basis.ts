@@ -5,9 +5,9 @@ type AncillaryIndex = number;
 
 interface Basis {
     label: string,
-    bucket_definitions: { [bucket_index: BucketIndex]: BucketDefinition },
-    participant_definitions: { [participant_index: ParticipantIndex]: ParticipantDefinition },
-    selection_round_names: { [round_index: RoundIndex]: string },
+    bucket_definitions: BucketDefinition[],
+    participant_definitions: ParticipantDefinition[],
+    selection_round_names: string[],
 }
 
 interface BucketDefinition {

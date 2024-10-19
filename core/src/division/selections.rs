@@ -25,15 +25,15 @@ impl Selections {
             selections: BTreeMap::new(),
         };
 
-        for round in basis.get_selection_rounds().keys() {
+        for round in 0..basis.get_selection_rounds().len() {
             let mut participant_selection_map: BTreeMap<ParticipantIndex, BTreeSet<Selection>> =
                 BTreeMap::new();
 
-            for participant in basis.get_participant_definitions().keys() {
-                participant_selection_map.insert(*participant, BTreeSet::new());
+            for participant in 0..basis.get_participant_definitions().len() {
+                participant_selection_map.insert(participant, BTreeSet::new());
             }
 
-            retval.selections.insert(*round, participant_selection_map);
+            retval.selections.insert(round, participant_selection_map);
         }
 
         retval

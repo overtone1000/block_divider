@@ -77,16 +77,16 @@ impl BucketState {
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 pub struct RoundStates {
-    round_states: BTreeMap<usize, BucketState>, //the state of each round in this bucket
+    round_states: Vec<BucketState>, //the state of each round in this bucket
 }
 
 impl RoundStates {
     pub fn new(basis: &BlockDivisionBasis) -> RoundStates {
         let mut retval = RoundStates {
-            round_states: BTreeMap::new(),
+            round_states: Vec::new(),
         };
-        for round in basis.get_selection_rounds().keys() {
-            retval.round_states.insert(*round, BucketState::new());
+        for round in 0..basis.get_selection_rounds().len() {
+            retval.round_states.insert(round, BucketState::new());
         }
         retval
     }
@@ -96,8 +96,8 @@ impl RoundStates {
         round: &RoundIndex,
         ancillary_designation: &AncillaryIndex,
     ) -> bool {
-        for n in self.round_states.keys() {
-            if n == round {
+        for n in 0..self.round_states.len() {
+            if n == *round {
                 break;
             }
             let state = self.get_state(&n);
@@ -112,11 +112,11 @@ impl RoundStates {
     }
 
     pub fn get_state(&self, round: &usize) -> &BucketState {
-        self.round_states.get(round).expect("Should exist.")
+        self.round_states.get(*round).expect("Should exist.")
     }
 
     pub fn get_state_mut(&mut self, round: &usize) -> &mut BucketState {
-        self.round_states.get_mut(round).expect("Should exist.")
+        self.round_states.get_mut(*round).expect("Should exist.")
     }
 
     pub fn selection_result(
@@ -129,4 +129,4 @@ impl RoundStates {
     }
 }
 
-pub type BucketStates = BTreeMap<BucketIndex, RoundStates>;
+pub type BucketStates = Vec<RoundStates>;

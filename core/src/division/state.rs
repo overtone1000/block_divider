@@ -44,9 +44,9 @@ pub struct BlockDivisionInput {
 
 impl BlockDivisionState {
     pub fn new(basis: &BlockDivisionBasis) -> BlockDivisionState {
-        let mut bucket_states: BucketStates = BTreeMap::new();
-        for bucket_index in basis.get_bucket_definitions().keys() {
-            bucket_states.insert(*bucket_index, RoundStates::new(basis));
+        let mut bucket_states: BucketStates = Vec::new();
+        for bucket_index in 0..basis.get_bucket_definitions().len() {
+            bucket_states.insert(bucket_index, RoundStates::new(basis));
         }
 
         let mut retval = BlockDivisionState {
@@ -71,7 +71,7 @@ impl BlockDivisionState {
         let pick_count = self
             .basis
             .get_participant_definitions()
-            .get(&participant_index)
+            .get(participant_index)
             .expect("Participant should exist.")
             .get_round_picks_allowed()
             .get(&round)
@@ -117,13 +117,13 @@ impl BlockDivisionState {
     fn determine_designations_from_current_selections(&mut self) {
         let mut selections_to_attempt: Vec<(usize, ParticipantIndex, Selection)> = Vec::new();
 
-        for round in self.basis.get_selection_rounds().keys() {
+        for round in 0..self.basis.get_selection_rounds().len() {
             match self.selections.get(&round) {
                 Some(participant_selections_map) => {
                     for (participant, selections) in participant_selections_map {
                         for selection in selections.iter() {
                             selections_to_attempt.push((
-                                *round,
+                                round,
                                 participant.clone(),
                                 selection.clone(),
                             ));
@@ -154,15 +154,15 @@ impl BlockDivisionState {
 
         println!(
             "Iterating through {} rounds.",
-            self.basis.get_selection_rounds().keys().len()
+            self.basis.get_selection_rounds().len()
         );
-        for round in self.basis.get_selection_rounds().keys() {
+        for round in 0..self.basis.get_selection_rounds().len() {
             println!("Round {}", round);
-            for (_bucket_name, bucket) in self.bucket_states.iter_mut() {
+            for bucket in self.bucket_states.iter_mut() {
                 let mut bucket_state_this_round: BTreeMap<ParticipantIndex, usize> =
                     BTreeMap::new();
 
-                for participant in self.basis.get_participant_definitions().keys() {
+                for participant in 0..self.basis.get_participant_definitions().len() {
                     /*
                     println!("");
                     println!(
@@ -227,10 +227,10 @@ impl BlockDivisionState {
 
     fn slots_available_this_round(&self, bucket_index: &usize, round: &usize) -> usize {
         let mut used_slots: usize = 0;
-        for current_round in self.basis.get_selection_rounds().keys() {
+        for current_round in 0..self.basis.get_selection_rounds().len() {
             used_slots += self
                 .bucket_states
-                .get(bucket_index)
+                .get(*bucket_index)
                 .expect("Bucket should exist.")
                 .get_state(&current_round)
                 .designations
@@ -240,7 +240,7 @@ impl BlockDivisionState {
         let available_slots = self
             .basis
             .get_bucket_definitions()
-            .get(bucket_index)
+            .get(*bucket_index)
             .expect("Bucket should exist.")
             .available_slots;
 
@@ -256,7 +256,7 @@ impl BlockDivisionState {
         let winners = {
             let bucket_states = self
                 .bucket_states
-                .get(&selection.bucket_index)
+                .get(selection.bucket_index)
                 .expect("Bucket should exist.");
             let round_state = bucket_states.get_state(&round);
 
@@ -297,7 +297,7 @@ impl BlockDivisionState {
             //Update ancillaries and designations
             let bucket_states_mut = self
                 .bucket_states
-                .get_mut(&selection.bucket_index)
+                .get_mut(selection.bucket_index)
                 .expect("Bucket should exist.");
             let round_state_mut = bucket_states_mut.get_state_mut(&round);
 
@@ -323,8 +323,8 @@ impl BlockDivisionState {
         match round_index {
             Some(round_index) => {
                 let mut contains_key = false;
-                for key in self.basis.get_selection_rounds().keys() {
-                    if key == &round_index {
+                for key in 0..self.basis.get_selection_rounds().len() {
+                    if key == round_index {
                         self.current_open_round = Some(round_index);
                         contains_key = true;
                         break;
@@ -355,23 +355,23 @@ mod tests {
 
     use super::*;
 
-    const PARTICIPANT_A: (usize, &str) = (2, "Participant A");
-    const PARTICIPANT_B: (usize, &str) = (18, "Participant A");
-    const PARTICIPANT_C: (usize, &str) = (47, "Participant A");
-    const BLACK_BUTTE: (usize, &str) = (5, "Black Butte");
-    const BUCKET_INDICES: [usize; 6] = [1, 5, 18, 2, 7, 77];
+    const PARTICIPANT_A: (usize, &str) = (0, "Participant A");
+    const PARTICIPANT_B: (usize, &str) = (1, "Participant B");
+    const PARTICIPANT_C: (usize, &str) = (2, "Participant C");
+    const BLACK_BUTTE: (usize, &str) = (0, "Black Butte");
+    const BUCKET_INDICES: [usize; 6] = [0, 1, 2, 3, 4, 5];
 
-    const ROUND_1: (usize, &str) = (2, "Predesignation");
-    const ROUND_2: (usize, &str) = (6, "Round 1");
-    const ROUND_3: (usize, &str) = (988, "Round 2");
-    const ROUND_4: (usize, &str) = (5, "Round 3");
+    const ROUND_1: (usize, &str) = (0, "Predesignation");
+    const ROUND_2: (usize, &str) = (1, "Round 1");
+    const ROUND_3: (usize, &str) = (2, "Round 2");
+    const ROUND_4: (usize, &str) = (3, "Round 3");
 
     fn bucketname(i: usize) -> String {
         "Bucket ".to_string() + &i.to_string()
     }
 
     fn create_basis() -> BlockDivisionBasis {
-        let mut buckets: BTreeMap<BucketIndex, BucketDef> = BTreeMap::new();
+        let mut buckets: Vec<BucketDef> = Vec::new();
 
         for n in BUCKET_INDICES {
             buckets.insert(
@@ -384,20 +384,20 @@ mod tests {
             );
         }
 
-        let rounds: BTreeMap<RoundIndex, RoundName> = BTreeMap::from([
-            (ROUND_1.0, ROUND_1.1.to_string()),
-            (ROUND_2.0, ROUND_2.1.to_string()),
-            (ROUND_3.0, ROUND_3.1.to_string()),
-            (ROUND_4.0, ROUND_4.1.to_string()),
+        let rounds: Vec<RoundName> = Vec::from([
+            ROUND_1.1.to_string(),
+            ROUND_2.1.to_string(),
+            ROUND_3.1.to_string(),
+            ROUND_4.1.to_string(),
         ]);
 
         let mut round_picks: BTreeMap<RoundIndex, u64> = BTreeMap::new();
         round_picks.insert(0, 3);
-        for n in rounds.keys() {
-            round_picks.insert(*n, 1);
+        for n in 0..rounds.len() {
+            round_picks.insert(n, 1);
         }
 
-        let mut participants: BTreeMap<ParticipantIndex, ParticipantDef> = BTreeMap::new();
+        let mut participants: Vec<ParticipantDef> = Vec::new();
 
         for participant in [PARTICIPANT_A, PARTICIPANT_B, PARTICIPANT_C] {
             participants.insert(
@@ -466,36 +466,28 @@ mod tests {
 
         let participant_index = PARTICIPANT_A.0;
 
-        let current_bucket_index = basis
-            .get_bucket_definitions()
-            .keys()
-            .next()
-            .expect("Should have a first value.");
-        let currentbucketname = bucketname(*current_bucket_index);
+        let current_bucket_index = BUCKET_INDICES[0];
+        let currentbucketname = bucketname(current_bucket_index);
 
-        let current_round_index = basis
-            .get_selection_rounds()
-            .keys()
-            .next()
-            .expect("Should have a first value.");
+        let current_round_index = ROUND_1.0;
 
         let mut selections_a: BTreeSet<Selection> = BTreeSet::new();
         let mut ancillaries_a: BTreeSet<AncillaryIndex> = BTreeSet::new();
         ancillaries_a.insert(BLACK_BUTTE.0);
 
         selections_a.insert(Selection {
-            bucket_index: *current_bucket_index,
+            bucket_index: current_bucket_index,
             ancillaries: ancillaries_a,
         });
 
-        bds.set_open_round(Some(*current_round_index), &mut conn)
+        bds.set_open_round(Some(current_round_index), &mut conn)
             .expect("Couldn't set open round.");
 
         bds.input_selection(
             &mut conn,
             participant_index,
             selections_a,
-            *current_round_index,
+            current_round_index,
         )
         .expect("Should be able to input selection.");
         bds.determine_designations_from_current_selections();
@@ -512,7 +504,7 @@ mod tests {
             .bucket_states
             .get(current_bucket_index)
             .expect("Should exist.")
-            .get_state(current_round_index)
+            .get_state(&current_round_index)
             .designations;
 
         let correctly_assigned = pertinent_designations.contains(&participant_index);
