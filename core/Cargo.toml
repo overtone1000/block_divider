@@ -15,6 +15,5 @@ chrono = { version = "^0.4", features = ["serde"] }
 rand = "^0"
 hyper-services = { path = "../../trm-rust-libs/hyper-services" }
 mail = { path = "../../trm-rust-libs/mail" }
-db = { path = "../../trm-rust-libs/db" }
-diesel = { version = "^2", features = ["postgres"] }
+diesel = { version = "^2", features = ["postgres", "r2d2"] }
 dotenvy = "^0" #loads environement variables from .env for development purposes

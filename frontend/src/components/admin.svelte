@@ -1,13 +1,15 @@
 <script lang="ts">
 	import Container from "./container.svelte";
 	import { onMount } from "svelte";
+	import BlockDivisionEdit from "./block_division/block_division_edit.svelte";
+	import { DisplayMode } from "../commons/commons";
+	import BlockDivisionCreate from "./block_division/block_division_create.svelte";
+	import BlockDivisionList from "./block_division/block_division_list.svelte";
 	import {
 		block_division_post,
 		type BlockDivisionPost,
 		type BlockDivisionPostResult
 	} from "../post/block_division_post";
-	import BlockDivisionEdit from "./block_division/block_division_edit.svelte";
-	import { DisplayMode } from "../commons/commons";
 
 	let message = "Loading...";
 	let list: BlockDivisionStateList | undefined = undefined;
@@ -22,9 +24,14 @@
 
 	let set_display_mode = (m: DisplayMode) => {
 		display_mode = m;
+
+		if (m === DisplayMode.List) {
+			selected_division = undefined;
+			loadlist();
+		}
 	};
 
-	onMount(async () => {
+	let loadlist = () => {
 		let post: BlockDivisionPost = {
 			GetDivisions: {}
 		};
@@ -43,39 +50,23 @@
 		};
 
 		block_division_post(post, callback);
-	});
+	};
 
-	$: {
-		if (selected_division !== undefined) {
-			display_mode = DisplayMode.Modify;
-		}
-	}
+	onMount(async () => {
+		loadlist();
+	});
 </script>
 
 <Container title="Block Division Administration">
-	<div slot="contents">
+	<div class="contents" slot="contents">
 		{#if display_mode == DisplayMode.Loading}
 			<div>{message}</div>
 		{:else if display_mode == DisplayMode.List && list !== undefined}
-			<div>
-				{#each list as block_division_item}
-					<a
-						href={window.location.href}
-						on:click={() => {
-							selected_division = block_division_item;
-							return false;
-						}}
-					>
-						{block_division_item[1].basis.label}
-					</a>
-				{/each}
-			</div>
+			<BlockDivisionList {set_display_mode} bind:list bind:selected_division />
 		{:else if display_mode == DisplayMode.Create}
-			<div></div>
+			<BlockDivisionCreate {set_display_mode} {selected_division} />
 		{:else if display_mode == DisplayMode.Modify && selected_division !== undefined}
-			<div>
-				<BlockDivisionEdit {set_display_mode} block_division_tuple={selected_division} />
-			</div>
+			<BlockDivisionEdit {set_display_mode} {selected_division} />
 		{:else}
 			<div>Error</div>
 		{/if}
@@ -83,4 +74,8 @@
 </Container>
 
 <style>
+	.contents {
+		height: 100%;
+		width: 100%;
+	}
 </style>

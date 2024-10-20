@@ -1,9 +1,13 @@
+use std::collections::BTreeMap;
+
 use db::DatabaseTransactable;
 use diesel::PgConnection;
 
 use crate::{
     division::state::BlockDivisionState,
-    server::requests::block_division_set_state::SetStateRequest,
+    server::requests::{
+        block_division_new_basis::NewBasisRequest, block_division_set_state::SetStateRequest,
+    },
 };
 
 use super::division::PersistentDivision;
@@ -13,8 +17,11 @@ pub enum DatabaseTransaction {
         String,
         tokio::sync::oneshot::Sender<Option<BlockDivisionState>>,
     ),
-    GetBlockDivisionList(tokio::sync::oneshot::Sender<Option<Vec<(String, BlockDivisionState)>>>),
+    GetBlockDivisionList(
+        tokio::sync::oneshot::Sender<Option<BTreeMap<String, BlockDivisionState>>>,
+    ),
     SetBlockDivisionState(SetStateRequest, tokio::sync::oneshot::Sender<Option<bool>>),
+    NewBlockDivisionBasis(NewBasisRequest, tokio::sync::oneshot::Sender<Option<bool>>),
 }
 
 impl DatabaseTransactable<PgConnection> for DatabaseTransaction {
@@ -22,9 +29,9 @@ impl DatabaseTransactable<PgConnection> for DatabaseTransaction {
         println!("Handling database transaction.");
 
         match self {
-            DatabaseTransaction::GetBlockDivisionState(basis, responder) => {
+            DatabaseTransaction::GetBlockDivisionState(id, responder) => {
                 println!("Getting state.");
-                let res = PersistentDivision::get_state_from_id(conn, &basis);
+                let res = PersistentDivision::get_state_from_id(conn, id);
 
                 let response = match res {
                     Ok(res) => res,
@@ -51,10 +58,31 @@ impl DatabaseTransactable<PgConnection> for DatabaseTransaction {
             }
             DatabaseTransaction::SetBlockDivisionState(request, responder) => {
                 println!("Setting persistent division.");
-                let res = match PersistentDivision::update(conn, request.get_state()) {
+                let res = match PersistentDivision::update(
+                    conn,
+                    request.get_id().to_string(),
+                    request.get_state(),
+                ) {
                     Ok(_) => true,
                     Err(_) => false,
                 };
+
+                println!("Sending response.");
+                responder
+                    .send(Some(res))
+                    .expect("Could not send to other thread.");
+            }
+            DatabaseTransaction::NewBlockDivisionBasis(request, responder) => {
+                println!("New persistent division.");
+                let res = match PersistentDivision::new(
+                    conn,
+                    request.get_id().to_string(),
+                    request.get_basis(),
+                ) {
+                    Ok(_) => true,
+                    Err(_) => false,
+                };
+
                 println!("Sending response.");
                 responder
                     .send(Some(res))

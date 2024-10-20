@@ -1,6 +1,6 @@
 
 interface GetState {
-    division_id: string
+    id: string
 }
 
 interface GetDivisions {

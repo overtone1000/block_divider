@@ -3,18 +3,18 @@
 	import FormField from "@smui/form-field";
 	import Select, { Option } from "@smui/select";
 	import SaveDiscard from "./save_discard.svelte";
-	import {
-		block_division_post,
-		type BlockDivisionPost,
-		type BlockDivisionPostResult
-	} from "../../post/block_division_post";
 
 	import { DisplayMode, handle_error } from "../../commons/commons";
+	import {
+		type BlockDivisionPost,
+		type BlockDivisionPostResult,
+		block_division_post
+	} from "../../post/block_division_post";
 
-	export let block_division_tuple: [string, BlockDivisionState];
+	export let selected_division: [string, BlockDivisionState];
 	export let set_display_mode: (mode: DisplayMode) => void;
 
-	let block_division = block_division_tuple[1];
+	let block_division = selected_division[1];
 
 	//Don't need to manage bucket states. That's internal to the program.
 	//Don't need to manage selections. That's controlled by users.
@@ -59,6 +59,7 @@
 	let save_func = () => {
 		let post: BlockDivisionPost = {
 			SetState: {
+				id: selected_division[0],
 				state: block_division
 			}
 		};
@@ -84,22 +85,25 @@
 </script>
 
 <div class="outer">
-	<FormField>
-		<Switch bind:checked={enabled} />
-		<span slot="label">{label}</span>
-	</FormField>
+	<div class="main">
+		<FormField>
+			<Switch bind:checked={enabled} />
+			<span slot="label">{label}</span>
+		</FormField>
 
-	<Select
-		disabled={!enabled}
-		key={keyfunc}
-		bind:value={current_open_round}
-		label="Current Open Round"
-	>
-		{#each round_indices as round_index}
-			<Option value={round_index}>{block_division.basis.selection_round_names[round_index]}</Option>
-		{/each}
-	</Select>
-
+		<Select
+			disabled={!enabled}
+			key={keyfunc}
+			bind:value={current_open_round}
+			label="Current Open Round"
+		>
+			{#each round_indices as round_index}
+				<Option value={round_index}
+					>{block_division.basis.selection_round_names[round_index]}</Option
+				>
+			{/each}
+		</Select>
+	</div>
 	<SaveDiscard {save_func} {discard_func} />
 </div>
 
@@ -107,5 +111,9 @@
 	.outer {
 		display: flex;
 		flex-direction: column;
+	}
+	.main {
+		flex-shrink: 1;
+		overflow: auto;
 	}
 </style>

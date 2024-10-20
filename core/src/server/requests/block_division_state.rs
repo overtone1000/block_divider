@@ -2,12 +2,12 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub(crate) struct GetStateRequest {
-    division_id: String,
+    id: i32,
 }
 
 impl GetStateRequest {
-    pub fn get_division_id(&self) -> &str {
-        &self.division_id
+    pub fn get_id(&self) -> i32 {
+        self.id
     }
 }
 
@@ -19,9 +19,7 @@ mod tests {
 
     #[test]
     fn serialization() {
-        let post = BlockDivisionPost::GetState(GetStateRequest {
-            division_id: "Test_Division_ID".to_string(),
-        });
+        let post = BlockDivisionPost::GetState(GetStateRequest { id: 900 });
 
         let serialized = serde_json::to_string_pretty(&post).expect("Should serialize.");
         let deserialized =

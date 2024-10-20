@@ -1,10 +1,6 @@
-use std::{
-    collections::BTreeMap,
-    hash::{Hash, Hasher},
-};
+use std::collections::BTreeMap;
 
 use diesel::prelude::*;
-use mail::is_valid_email;
 
 use crate::{
     division::{basis::BlockDivisionBasis, state::BlockDivisionState},
@@ -15,20 +11,20 @@ use crate::{
 #[diesel(table_name = crate::schema::divisions)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct PersistentDivision {
-    hash: String,
+    id: String,
     serialized: String,
 }
 
 impl PersistentDivision {
-    pub fn get_from_basis(
-        conn: &mut PgConnection,
-        basis: &BlockDivisionBasis,
-    ) -> Option<PersistentDivision> {
-        let hash = basis.get_hash();
-        Self::get_from_id(conn, &hash)
+    pub fn get_id(&self) -> String {
+        self.id.to_string()
     }
 
-    pub fn get_from_id(conn: &mut PgConnection, id: &str) -> Option<PersistentDivision> {
+    pub fn get_state(&self) -> BlockDivisionState {
+        serde_json::from_str(&self.serialized).expect("Couldn't deserialize persistent division.")
+    }
+
+    pub fn get_from_id(conn: &mut PgConnection, id: String) -> Option<PersistentDivision> {
         let retval = divisions::table
             .find(id)
             .select(PersistentDivision::as_select())
@@ -41,7 +37,7 @@ impl PersistentDivision {
 
     pub fn get_state_from_id(
         conn: &mut PgConnection,
-        id: &str,
+        id: String,
     ) -> Result<Option<BlockDivisionState>, Box<dyn std::error::Error>> {
         let pd = PersistentDivision::get_from_id(conn, id);
         match pd {
@@ -53,52 +49,37 @@ impl PersistentDivision {
     //Returns a vector of tuples containing (Hash,BlockDivisionState)
     pub fn get_all(
         conn: &mut PgConnection,
-    ) -> Result<Vec<(String, BlockDivisionState)>, Box<dyn std::error::Error>> {
+    ) -> Result<BTreeMap<String, BlockDivisionState>, Box<dyn std::error::Error>> {
         let result = divisions::table
             .select(PersistentDivision::as_select())
             .load(conn);
 
         match result {
-            Ok(result) => {
-                let mut vec = result
-                    .iter()
-                    .map(|pd| {
-                        (
-                            pd.hash.clone(),
-                            pd.as_state()
-                                .expect("Couldn't convert persistent division to state."),
-                        )
-                    })
-                    .collect::<Vec<(String, BlockDivisionState)>>();
-                vec.sort_by(|a, b| a.1.basis.get_label().cmp(b.1.basis.get_label()));
-
-                Ok(vec)
-            }
+            Ok(result) => Ok(result
+                .iter()
+                .map(|pd| {
+                    (
+                        pd.id.clone(),
+                        pd.as_state()
+                            .expect("Couldn't convert persistent division to state."),
+                    )
+                })
+                .collect::<BTreeMap<String, BlockDivisionState>>()),
             Err(e) => Err(Box::new(e)),
         }
     }
 
-    pub fn insert(
-        conn: &mut PgConnection,
-        insertion: PersistentDivision,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        diesel::insert_into(divisions::table)
-            .values(&insertion)
-            .execute(conn)?;
-
-        Ok(())
-    }
-
     pub fn update(
         conn: &mut PgConnection,
+        id: String,
         state: &BlockDivisionState,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let update = PersistentDivision {
-            hash: state.basis.get_hash(),
+            id: id.to_string(),
             serialized: serde_json::to_string(&state)?,
         };
 
-        diesel::update(divisions::table.find(update.hash))
+        diesel::update(divisions::table.find(id))
             .set(divisions::serialized.eq(update.serialized))
             .execute(conn)?;
 
@@ -110,44 +91,29 @@ impl PersistentDivision {
         Ok(serde_json::from_str(str)?)
     }
 
-    pub fn get_or_create(
+    pub fn new(
         conn: &mut PgConnection,
+        id: String,
         basis: &BlockDivisionBasis,
-    ) -> Result<BlockDivisionState, Box<dyn std::error::Error>> {
-        let hash = basis.get_hash();
+    ) -> Result<PersistentDivision, Box<dyn std::error::Error>> {
+        let new_state = BlockDivisionState::new(basis);
+        let insertion = PersistentDivision {
+            id: id,
+            serialized: serde_json::to_string(&new_state)?,
+        };
 
-        let resulting_persistent_division = Self::get_from_basis(conn, basis);
+        diesel::insert_into(divisions::table)
+            .values(&insertion)
+            .execute(conn)
+            .expect("Error creating new persistent division");
 
-        match resulting_persistent_division {
-            Some(result) => result.as_state(),
-            None => {
-                let retval = BlockDivisionState::new(basis);
-
-                Self::insert(
-                    conn,
-                    PersistentDivision {
-                        hash: hash,
-                        serialized: serde_json::to_string(&retval)?,
-                    },
-                )?;
-
-                Ok(retval)
-            }
-        }
+        Ok(insertion)
     }
 
     pub fn delete_division(
         conn: &mut PgConnection,
-        hash: &str,
+        id: String,
     ) -> Result<usize, diesel::result::Error> {
-        diesel::delete(divisions::table.find(hash)).execute(conn)
-    }
-
-    pub fn delete_division_from_basis(
-        conn: &mut PgConnection,
-        basis: &BlockDivisionBasis,
-    ) -> Result<usize, diesel::result::Error> {
-        let hash = basis.get_hash();
-        Self::delete_division(conn, &hash)
+        diesel::delete(divisions::table.find(id)).execute(conn)
     }
 }

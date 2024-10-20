@@ -1,8 +1,8 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    divisions (hash) {
-        hash -> Text,
+    divisions (id) {
+        id -> Text,
         serialized -> Text,
     }
 }

@@ -1,8 +1,8 @@
 use serde::Serialize;
-use std::{future::Future, pin::Pin, sync::Arc};
+use std::{borrow::BorrowMut, future::Future, pin::Pin, sync::Arc};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
-use diesel::{IntoSql, PgConnection};
+use diesel::{r2d2::ConnectionManager, IntoSql, PgConnection};
 use http_body_util::{combinators::BoxBody, BodyExt, Full};
 use hyper::{
     body::{Bytes, Frame, Incoming},
@@ -22,7 +22,7 @@ use crate::{db::handler::DatabaseTransaction, server::requests::BlockDivisionPos
 
 #[derive(Clone)]
 pub struct PostHandler {
-    database_transaction_handler: UnboundedSender<DatabaseTransaction>,
+    database_transaction_handler: ConnectionManager<PgConnection>,
 }
 
 const BLOCK_DIVISION: &str = "/block_division_post";
@@ -70,7 +70,7 @@ impl PostHandler {
                     BlockDivisionPost::GetState(get_state_request) => {
                         let (sender, receiver) = tokio::sync::oneshot::channel();
                         let transaction = DatabaseTransaction::GetBlockDivisionState(
-                            get_state_request.get_division_id().to_string(),
+                            get_state_request.get_id().to_string(),
                             sender,
                         );
                         database_handler_query(
@@ -101,6 +101,17 @@ impl PostHandler {
                         )
                         .await
                     }
+                    BlockDivisionPost::NewBasis(new_basis_request) => {
+                        let (sender, receiver) = tokio::sync::oneshot::channel();
+                        let transaction =
+                            DatabaseTransaction::NewBlockDivisionBasis(new_basis_request, sender);
+                        database_handler_query(
+                            transaction,
+                            &mut self.database_transaction_handler,
+                            receiver,
+                        )
+                        .await
+                    }
                 },
                 Err(err) => generic_json_error_from_debug(err),
             }
@@ -114,7 +125,7 @@ impl PostHandler {
 
 async fn database_handler_query<T>(
     transaction: DatabaseTransaction,
-    transaction_handler: &mut UnboundedSender<DatabaseTransaction>,
+    transaction_handler: ConnectionManager<PgConnection>,
     receiver: tokio::sync::oneshot::Receiver<Option<T>>,
 ) -> Response<
     http_body_util::combinators::BoxBody<

@@ -4,7 +4,6 @@ type RoundIndex = number;
 type AncillaryIndex = number;
 
 interface Basis {
-    label: string,
     bucket_definitions: BucketDefinition[],
     participant_definitions: ParticipantDefinition[],
     selection_round_names: string[],

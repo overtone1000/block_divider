@@ -1,8 +1,8 @@
 use std::net::{IpAddr, Ipv4Addr};
 
 use ::db::AsyncDatabaseTransactionHandler;
-use db::{establish_connection, handler::DatabaseTransaction};
-use diesel::PgConnection;
+use db::{database_url, establish_connection, handler::DatabaseTransaction};
+use diesel::{r2d2::ConnectionManager, PgConnection};
 use hyper_services::{
     service::{stateful_service::StatefulService, stateless_service::StatelessService},
     spawn_server,
@@ -20,11 +20,13 @@ const PORT: u16 = 8181;
 
 pub async fn tokio_serve<'a>() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("Starting database transaction handler");
-    let mut db_handler: AsyncDatabaseTransactionHandler<DatabaseTransaction, PgConnection> =
-        AsyncDatabaseTransactionHandler::new(establish_connection);
+    //let mut db_handler: AsyncDatabaseTransactionHandler<DatabaseTransaction, PgConnection> =
+    //    AsyncDatabaseTransactionHandler::new(establish_connection);
+
+    let db_handler = ConnectionManager::<PgConnection>::new(database_url());
 
     println!("Building server");
-    let service = PostHandler::new(db_handler.get_sender());
+    let service = PostHandler::new(db_handler);
     let server = spawn_server(
         IpAddr::V4(Ipv4Addr::LOCALHOST),
         PORT,

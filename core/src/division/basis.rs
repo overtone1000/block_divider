@@ -1,9 +1,8 @@
-use std::{
-    collections::BTreeMap,
-    hash::{Hash, Hasher},
-};
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
+
+use crate::db::division::PersistentDivision;
 
 use super::{
     bucket::{BucketDef, BucketIndex},
@@ -13,7 +12,6 @@ use super::{
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct BlockDivisionBasis {
-    label: String,
     bucket_definitions: Vec<BucketDef>,
     participant_definitions: Vec<ParticipantDef>,
     selection_round_names: Vec<RoundName>,
@@ -21,21 +19,15 @@ pub struct BlockDivisionBasis {
 
 impl BlockDivisionBasis {
     pub fn create(
-        label: String,
         bucket_definitions: Vec<BucketDef>,
         participant_definitions: Vec<ParticipantDef>,
         selection_round_names: Vec<RoundName>,
     ) -> BlockDivisionBasis {
         BlockDivisionBasis {
-            label: label,
             bucket_definitions: bucket_definitions,
             participant_definitions: participant_definitions,
             selection_round_names: selection_round_names,
         }
-    }
-
-    pub fn get_label(&self) -> &str {
-        &self.label
     }
 
     pub fn get_selection_rounds(&self) -> &Vec<RoundName> {
@@ -67,15 +59,5 @@ impl BlockDivisionBasis {
             .get(index)
             .expect("Selection round not found.")
             .to_string()
-    }
-
-    pub fn get_hash(&self) -> String {
-        let mut hasher = std::hash::DefaultHasher::new();
-        for bucket_definition in &self.bucket_definitions {
-            bucket_definition.hash(&mut hasher);
-        }
-        self.participant_definitions.hash(&mut hasher);
-        self.selection_round_names.hash(&mut hasher);
-        hasher.finish().to_string()
     }
 }

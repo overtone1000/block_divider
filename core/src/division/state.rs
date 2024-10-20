@@ -63,6 +63,7 @@ impl BlockDivisionState {
 
     pub fn input_selection(
         &mut self,
+        id: String,
         conn: &mut PgConnection,
         participant_index: ParticipantIndex,
         selections: BTreeSet<Selection>,
@@ -98,7 +99,7 @@ impl BlockDivisionState {
                 } else {
                     self.selections.set(round, participant_index, selections);
                     self.determine_designations_from_current_selections();
-                    match self.save_state(conn) {
+                    match self.save_state(id, conn) {
                         Ok(_) => Ok(()),
                         Err(_) => Err(Box::new(std::io::Error::new(
                             std::io::ErrorKind::InvalidInput,
@@ -139,8 +140,12 @@ impl BlockDivisionState {
         }
     }
 
-    fn save_state(&mut self, conn: &mut PgConnection) -> Result<(), Box<dyn std::error::Error>> {
-        PersistentDivision::update(conn, self)
+    fn save_state(
+        &mut self,
+        id: String,
+        conn: &mut PgConnection,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        PersistentDivision::update(conn, id, self)
     }
 
     fn generate_ranks(&mut self) {
@@ -317,6 +322,7 @@ impl BlockDivisionState {
 
     pub fn set_open_round(
         &mut self,
+        id: String,
         round_index: Option<usize>,
         conn: &mut PgConnection,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -341,7 +347,7 @@ impl BlockDivisionState {
         };
 
         self.current_open_round = round_index;
-        self.save_state(conn)
+        self.save_state(id, conn)
     }
 }
 
@@ -406,12 +412,7 @@ mod tests {
             );
         }
 
-        BlockDivisionBasis::create(
-            "Test Block Division".to_string(),
-            buckets,
-            participants,
-            rounds,
-        )
+        BlockDivisionBasis::create(buckets, participants, rounds)
     }
 
     #[test]
@@ -420,20 +421,32 @@ mod tests {
         let mut conn = establish_connection();
         let basis = create_basis();
 
-        match PersistentDivision::delete_division_from_basis(&mut conn, &basis) //Delete any remnant
-        {
-            Ok(_)=>{},
-            Err(_)=>{println!("Couldn't delete, but this may not be an error.");}
-        };
+        let id1 = "Test Block Division 1";
+        let id2 = "Test Block Division 2";
 
-        PersistentDivision::get_or_create(&mut conn, &basis) //create to test overwriting
+        match PersistentDivision::delete_division(&mut conn, id1.to_string()) {
+            Ok(_) => {}
+            Err(e) => {
+                eprintln!("Couldn't delete pre-existing pd, but this may not be an error.");
+            }
+        }
+
+        match PersistentDivision::delete_division(&mut conn, id2.to_string()) {
+            Ok(_) => {}
+            Err(e) => {
+                eprintln!("Couldn't delete pre-existing pd, but this may not be an error.");
+            }
+        }
+
+        let pd = PersistentDivision::new(&mut conn, id1.to_string(), &basis) //create to test overwriting
             .expect("Should work.");
         let delete_count =
-            PersistentDivision::delete_division_from_basis(&mut conn, &basis).expect("Should work"); //Delete just created, should have a result
+            PersistentDivision::delete_division(&mut conn, pd.get_id()).expect("Should work"); //Delete just created, should have a result
         assert!(delete_count == 1);
 
-        let bds = PersistentDivision::get_or_create(&mut conn, &basis) //recreate to test ignoring
+        let pd = PersistentDivision::new(&mut conn, id1.to_string(), &basis) //recreate to test ignoring
             .expect("Should work.");
+        let bds = pd.get_state();
 
         println!("----------------------");
         println!("Block Division State Serialization:");
@@ -441,14 +454,13 @@ mod tests {
         println!("----------------------");
         println!("");
 
-        let bds2 = PersistentDivision::get_or_create(&mut conn, &basis) //recreate to test equivalence
+        let pd2 = PersistentDivision::new(&mut conn, id2.to_string(), &basis) //recreate to test equivalence
             .expect("Should work.");
+        let bds2 = pd2.get_state();
 
-        assert!(bds == bds2); //bds created from cache must be equal to the one that created the cache
-        assert!(
-            serde_json::to_string(&bds).expect("Should serialize.")
-                == serde_json::to_string(&bds2).expect("Should serialize.")
-        ); //serializations should also be equal.
+        assert!(pd != pd2); //Should have different ids.
+        assert!(bds.basis == bds2.basis); //But basis should be identical
+        assert!(bds.current_open_round == bds2.current_open_round); //And current round as well
     }
 
     #[test]
@@ -457,12 +469,16 @@ mod tests {
         let mut conn = establish_connection();
         let basis = create_basis();
 
-        match PersistentDivision::delete_division_from_basis(&mut conn, &basis) //Delete any remnant
-        {
-            Ok(_)=>{},
-            Err(_)=>{println!("Couldn't delete, but this may not be an error.");}
+        let id1 = "Test Block Division 3";
+        match PersistentDivision::delete_division(&mut conn, id1.to_string()) {
+            Ok(_) => {}
+            Err(e) => {
+                eprintln!("Couldn't delete pre-existing pd, but this may not be an error.");
+            }
         }
-        let mut bds = PersistentDivision::get_or_create(&mut conn, &basis).expect("Should work.");
+        let pd = PersistentDivision::new(&mut conn, id1.to_string(), &basis) //create to test overwriting
+            .expect("Should work.");
+        let mut bds = pd.get_state();
 
         let participant_index = PARTICIPANT_A.0;
 
@@ -480,10 +496,11 @@ mod tests {
             ancillaries: ancillaries_a,
         });
 
-        bds.set_open_round(Some(current_round_index), &mut conn)
+        bds.set_open_round(pd.get_id(), Some(current_round_index), &mut conn)
             .expect("Couldn't set open round.");
 
         bds.input_selection(
+            pd.get_id(),
             &mut conn,
             participant_index,
             selections_a,

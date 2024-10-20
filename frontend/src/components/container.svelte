@@ -65,6 +65,7 @@
 		flex-direction: column;
 		flex-grow: 1;
 		min-height: 1px;
+		overflow: auto;
 	}
 	.spacer {
 		flex-grow: 1;

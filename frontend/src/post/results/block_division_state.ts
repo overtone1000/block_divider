@@ -1,5 +1,5 @@
 
-type BlockDivisionStateList = [[string, BlockDivisionState]]
+type BlockDivisionStateList = { [label: string]: BlockDivisionState }
 
 interface BlockDivisionState {
     basis: Basis,
