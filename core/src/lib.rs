@@ -1,8 +1,6 @@
-use diesel::prelude::*;
-
 use std::net::{IpAddr, Ipv4Addr};
 
-use db::{database_url, establish_connection};
+use db::database_url;
 use diesel::{
     r2d2::{ConnectionManager, Pool},
     PgConnection,
@@ -36,15 +34,27 @@ pub async fn tokio_serve<'a>() -> Result<(), Box<dyn std::error::Error + Send + 
 
     println!("Building server");
     let service = PostHandler::new(db_handler);
-    let server = spawn_server(
-        IpAddr::V4(Ipv4Addr::LOCALHOST),
-        PORT,
-        StatefulService::<PostHandler>::create(service),
-    );
 
-    println!("Server up.");
+    loop {
+        println!("Starting server.");
 
-    tokio::try_join!(server)?;
+        let server = spawn_server(
+            IpAddr::V4(Ipv4Addr::LOCALHOST),
+            PORT,
+            StatefulService::<PostHandler>::create(service.clone()),
+        );
 
-    Ok(())
+        println!("Server up.");
+
+        match tokio::try_join!(server) {
+            Ok(_) => {
+                println!("Server exited gracefully.");
+                return Ok(());
+            }
+            Err(e) => {
+                eprintln!("Server error: {:?}", e);
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            }
+        }
+    }
 }
