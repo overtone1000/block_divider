@@ -3,15 +3,14 @@ use dotenvy::dotenv;
 use std::env;
 
 pub mod division;
-pub mod handler;
 pub mod user;
 
 pub fn database_url() -> String {
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    env::var("DATABASE_URL").expect("DATABASE_URL must be set")
 }
 
 pub fn establish_connection() -> PgConnection {
-    PgConnection::establish(&database_url)
+    PgConnection::establish(&database_url())
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url()))
 }
 

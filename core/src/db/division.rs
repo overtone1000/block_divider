@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 
-use diesel::prelude::*;
+use diesel::{
+    prelude::*,
+    r2d2::{ConnectionManager, PooledConnection},
+};
 
 use crate::{
     division::{basis::BlockDivisionBasis, state::BlockDivisionState},
@@ -24,7 +27,7 @@ impl PersistentDivision {
         serde_json::from_str(&self.serialized).expect("Couldn't deserialize persistent division.")
     }
 
-    pub fn get_from_id(conn: &mut PgConnection, id: String) -> Option<PersistentDivision> {
+    pub fn get_from_id(conn: &mut PgConnection, id: &str) -> Option<PersistentDivision> {
         let retval = divisions::table
             .find(id)
             .select(PersistentDivision::as_select())
@@ -37,7 +40,7 @@ impl PersistentDivision {
 
     pub fn get_state_from_id(
         conn: &mut PgConnection,
-        id: String,
+        id: &str,
     ) -> Result<Option<BlockDivisionState>, Box<dyn std::error::Error>> {
         let pd = PersistentDivision::get_from_id(conn, id);
         match pd {

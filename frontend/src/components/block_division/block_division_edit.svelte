@@ -16,6 +16,8 @@
 
 	let block_division = selected_division[1];
 
+	console.debug("Block division:", block_division);
+
 	//Don't need to manage bucket states. That's internal to the program.
 	//Don't need to manage selections. That's controlled by users.
 
@@ -45,6 +47,7 @@
 
 	let round_indices: number[] = [];
 	for (let n = 0; n < block_division.basis.selection_round_names.length; n++) {
+		console.debug("Pushing index " + n);
 		round_indices.push(n);
 	}
 
@@ -111,9 +114,15 @@
 	.outer {
 		display: flex;
 		flex-direction: column;
+		flex-grow: 1;
+		overflow: auto;
+		padding: 20px;
+		min-height: 50%; /* Needed for select to display correctly */
 	}
 	.main {
-		flex-shrink: 1;
-		overflow: auto;
+		display: flex;
+		flex-direction: column;
+		flex-grow: 1;
+		padding: 20px;
 	}
 </style>

@@ -1,8 +1,12 @@
+use diesel::prelude::*;
+
 use std::net::{IpAddr, Ipv4Addr};
 
-use ::db::AsyncDatabaseTransactionHandler;
-use db::{database_url, establish_connection, handler::DatabaseTransaction};
-use diesel::{r2d2::ConnectionManager, PgConnection};
+use db::{database_url, establish_connection};
+use diesel::{
+    r2d2::{ConnectionManager, Pool},
+    PgConnection,
+};
 use hyper_services::{
     service::{stateful_service::StatefulService, stateless_service::StatelessService},
     spawn_server,
@@ -23,7 +27,12 @@ pub async fn tokio_serve<'a>() -> Result<(), Box<dyn std::error::Error + Send + 
     //let mut db_handler: AsyncDatabaseTransactionHandler<DatabaseTransaction, PgConnection> =
     //    AsyncDatabaseTransactionHandler::new(establish_connection);
 
-    let db_handler = ConnectionManager::<PgConnection>::new(database_url());
+    let cm = ConnectionManager::<PgConnection>::new(database_url());
+
+    let db_handler = Pool::builder()
+        .test_on_check_out(true)
+        .build(cm)
+        .expect("Could not build connection pool");
 
     println!("Building server");
     let service = PostHandler::new(db_handler);
@@ -35,7 +44,7 @@ pub async fn tokio_serve<'a>() -> Result<(), Box<dyn std::error::Error + Send + 
 
     println!("Server up.");
 
-    tokio::try_join!(server, db_handler.start())?;
+    tokio::try_join!(server)?;
 
     Ok(())
 }

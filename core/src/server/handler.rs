@@ -1,8 +1,12 @@
+use hyper_util::client::legacy::connect::Connect;
 use serde::Serialize;
 use std::{borrow::BorrowMut, future::Future, pin::Pin, sync::Arc};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
-use diesel::{r2d2::ConnectionManager, IntoSql, PgConnection};
+use diesel::{
+    r2d2::{ConnectionManager, Pool, PooledConnection},
+    IntoSql, PgConnection,
+};
 use http_body_util::{combinators::BoxBody, BodyExt, Full};
 use hyper::{
     body::{Bytes, Frame, Incoming},
@@ -18,11 +22,11 @@ use hyper_services::{
     service::stateful_service::StatefulHandler,
 };
 
-use crate::{db::handler::DatabaseTransaction, server::requests::BlockDivisionPost};
+use crate::{db::division::PersistentDivision, server::requests::BlockDivisionPost};
 
 #[derive(Clone)]
 pub struct PostHandler {
-    database_transaction_handler: ConnectionManager<PgConnection>,
+    database_transaction_handler: Pool<ConnectionManager<PgConnection>>,
 }
 
 const BLOCK_DIVISION: &str = "/block_division_post";
@@ -53,9 +57,18 @@ impl StatefulHandler for PostHandler {
 }
 
 impl PostHandler {
-    pub fn new(database_transaction_handler: UnboundedSender<DatabaseTransaction>) -> PostHandler {
+    pub fn new(database_transaction_handler: Pool<ConnectionManager<PgConnection>>) -> PostHandler {
         PostHandler {
             database_transaction_handler: database_transaction_handler,
+        }
+    }
+
+    fn get_conn(
+        &self,
+    ) -> Result<PooledConnection<ConnectionManager<PgConnection>>, Box<dyn std::error::Error>> {
+        match self.database_transaction_handler.get() {
+            Ok(conn) => Ok(conn),
+            Err(e) => Err(Box::new(e)),
         }
     }
 
@@ -64,53 +77,61 @@ impl PostHandler {
 
         println!("Handling request {}", &as_string);
 
+        let mut conn = match self.get_conn() {
+            Ok(conn) => conn,
+            Err(err) => {
+                eprintln!("{}", err);
+                return Ok(permit_all_cors(generic_json_error_from_debug(err)));
+            }
+        };
+
         let mut response = {
             match serde_json::from_str::<BlockDivisionPost>(&as_string) {
                 Ok(request_body) => match request_body {
                     BlockDivisionPost::GetState(get_state_request) => {
-                        let (sender, receiver) = tokio::sync::oneshot::channel();
-                        let transaction = DatabaseTransaction::GetBlockDivisionState(
-                            get_state_request.get_id().to_string(),
-                            sender,
+                        let res = PersistentDivision::get_state_from_id(
+                            &mut conn,
+                            get_state_request.get_id(),
                         );
-                        database_handler_query(
-                            transaction,
-                            &mut self.database_transaction_handler,
-                            receiver,
-                        )
-                        .await
+
+                        let response = match res {
+                            Ok(res) => res,
+                            Err(e) => {
+                                eprintln!("{}", e);
+                                None
+                            }
+                        };
+
+                        get_response(response)
                     }
                     BlockDivisionPost::GetDivisions(_) => {
-                        let (sender, receiver) = tokio::sync::oneshot::channel();
-                        let transaction = DatabaseTransaction::GetBlockDivisionList(sender);
-                        database_handler_query(
-                            transaction,
-                            &mut self.database_transaction_handler,
-                            receiver,
-                        )
-                        .await
+                        let res = PersistentDivision::get_all(&mut conn)
+                            .expect("Couldn't get all from persistent division table.");
+                        get_response(Some(res))
                     }
                     BlockDivisionPost::SetState(set_state_request) => {
-                        let (sender, receiver) = tokio::sync::oneshot::channel();
-                        let transaction =
-                            DatabaseTransaction::SetBlockDivisionState(set_state_request, sender);
-                        database_handler_query(
-                            transaction,
-                            &mut self.database_transaction_handler,
-                            receiver,
-                        )
-                        .await
+                        let res = match PersistentDivision::update(
+                            &mut conn,
+                            set_state_request.get_id().to_string(),
+                            set_state_request.get_state(),
+                        ) {
+                            Ok(_) => true,
+                            Err(_) => false,
+                        };
+                        get_response(Some(res))
                     }
                     BlockDivisionPost::NewBasis(new_basis_request) => {
-                        let (sender, receiver) = tokio::sync::oneshot::channel();
-                        let transaction =
-                            DatabaseTransaction::NewBlockDivisionBasis(new_basis_request, sender);
-                        database_handler_query(
-                            transaction,
-                            &mut self.database_transaction_handler,
-                            receiver,
-                        )
-                        .await
+                        println!("New persistent division.");
+                        let res = match PersistentDivision::new(
+                            &mut conn,
+                            new_basis_request.get_id().to_string(),
+                            new_basis_request.get_basis(),
+                        ) {
+                            Ok(_) => true,
+                            Err(_) => false,
+                        };
+
+                        get_response(Some(res))
                     }
                 },
                 Err(err) => generic_json_error_from_debug(err),
@@ -123,10 +144,8 @@ impl PostHandler {
     }
 }
 
-async fn database_handler_query<T>(
-    transaction: DatabaseTransaction,
-    transaction_handler: ConnectionManager<PgConnection>,
-    receiver: tokio::sync::oneshot::Receiver<Option<T>>,
+fn get_response<T>(
+    message: Option<T>,
 ) -> Response<
     http_body_util::combinators::BoxBody<
         hyper::body::Bytes,
@@ -136,35 +155,10 @@ async fn database_handler_query<T>(
 where
     T: Serialize,
 {
-    println!("Awaiting transaction result.");
-    let state = transaction_handler.send(transaction);
-
-    match state {
-        Ok(_) => get_oneshot_response::<T>(receiver).await,
-        Err(err) => generic_json_error_from_debug(err),
-    }
-}
-
-async fn get_oneshot_response<T>(
-    receiver: tokio::sync::oneshot::Receiver<Option<T>>,
-) -> Response<
-    http_body_util::combinators::BoxBody<
-        hyper::body::Bytes,
-        Box<dyn std::error::Error + Send + Sync>,
-    >,
->
-where
-    T: Serialize,
-{
-    println!("Awaiting one shot response.");
-    let result = receiver.await;
-    match result {
-        Ok(result) => match result {
-            Some(result) => Response::new(full_to_boxed_body(
-                serde_json::to_string(&result).expect("Couldn't serialize result"),
-            )),
-            None => generic_json_error("No such state."),
-        },
-        Err(err) => generic_json_error_from_debug(err),
+    match message {
+        Some(result) => Response::new(full_to_boxed_body(
+            serde_json::to_string(&result).expect("Couldn't serialize result"),
+        )),
+        None => generic_json_error("No such state."),
     }
 }
