@@ -22,7 +22,7 @@
 			selection_round_names: []
 		};
 	} else {
-		id = selected_division[0];
+		id = selected_division[0] + " (Copy)";
 		basis = selected_division[1].basis;
 	}
 
