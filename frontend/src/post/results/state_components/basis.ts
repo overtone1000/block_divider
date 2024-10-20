@@ -17,5 +17,6 @@ interface BucketDefinition {
 
 interface ParticipantDefinition {
     name: string,
+    email: string,
     round_picks_allowed: { [round_index: RoundIndex]: number }
 }

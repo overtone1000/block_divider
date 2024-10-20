@@ -10,6 +10,7 @@ pub type ParticipantIndex = usize;
 #[derive(Clone, Deserialize, Serialize, Hash, PartialEq, Eq, Debug)]
 pub struct ParticipantDef {
     name: String,
+    email: String,
     round_picks_allowed: BTreeMap<RoundIndex, u64>,
 }
 
@@ -22,9 +23,14 @@ impl ParticipantDef {
         &self.round_picks_allowed
     }
 
-    pub fn create(name: String, round_picks_allowed: BTreeMap<RoundIndex, u64>) -> ParticipantDef {
+    pub fn create(
+        name: String,
+        email: String,
+        round_picks_allowed: BTreeMap<RoundIndex, u64>,
+    ) -> ParticipantDef {
         ParticipantDef {
             name: name,
+            email: email,
             round_picks_allowed: round_picks_allowed,
         }
     }

@@ -83,8 +83,26 @@
 			Participants
 			<div class="list">
 				{#each basis.participant_definitions as participant_definition}
-					<div class="area">
-						<Textfield label="Participant Name" bind:value={participant_definition.name} />
+					<div class="area row">
+						<div class="col textboxwidth">
+							<Textfield label="Participant Name" bind:value={participant_definition.name} />
+							<Textfield label="E-mail" type="email" bind:value={participant_definition.email} />
+						</div>
+						<div class="area col">
+							Picks allowed per round
+							<div class="row">
+								{#each Object.keys(participant_definition.round_picks_allowed) as picks_allowed_index}
+									<Textfield
+										bind:value={participant_definition.round_picks_allowed[
+											parseInt(picks_allowed_index)
+										]}
+										label={basis.selection_round_names[parseInt(picks_allowed_index)]}
+										type="number"
+										input$step="1"
+									/>
+								{/each}
+							</div>
+						</div>
 					</div>
 				{/each}
 			</div>
@@ -121,6 +139,18 @@
 		border-width: 1px;
 		border-style: solid;
 		border-radius: 10px;
+	}
+	.row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+	.col {
+		display: flex;
+		flex-direction: column;
+	}
+	.textboxwidth {
+		width: 300px;
 	}
 	.list {
 		display: flex;

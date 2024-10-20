@@ -361,9 +361,9 @@ mod tests {
 
     use super::*;
 
-    const PARTICIPANT_A: (usize, &str) = (0, "Participant A");
-    const PARTICIPANT_B: (usize, &str) = (1, "Participant B");
-    const PARTICIPANT_C: (usize, &str) = (2, "Participant C");
+    const PARTICIPANT_A: (usize, &str, &str) = (0, "Participant A", "testing_a@autoscheda.com");
+    const PARTICIPANT_B: (usize, &str, &str) = (1, "Participant B", "testing_b@autoscheda.com");
+    const PARTICIPANT_C: (usize, &str, &str) = (2, "Participant C", "testing_c@autoscheda.com");
     const BLACK_BUTTE: (usize, &str) = (0, "Black Butte");
     const BUCKET_INDICES: [usize; 6] = [0, 1, 2, 3, 4, 5];
 
@@ -408,7 +408,11 @@ mod tests {
         for participant in [PARTICIPANT_A, PARTICIPANT_B, PARTICIPANT_C] {
             participants.insert(
                 participant.0,
-                ParticipantDef::create(participant.1.to_string(), round_picks.clone()),
+                ParticipantDef::create(
+                    participant.1.to_string(),
+                    participant.2.to_string(),
+                    round_picks.clone(),
+                ),
             );
         }
 
