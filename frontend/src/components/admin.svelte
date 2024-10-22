@@ -7,6 +7,7 @@
 	import BlockDivisionList from "./block_division/block_division_list.svelte";
 	import {
 		block_division_post,
+		ErrorResult,
 		type BlockDivisionPost,
 		type BlockDivisionPostResult
 	} from "../post/block_division_post";
@@ -38,8 +39,8 @@
 
 		let callback = (result: BlockDivisionPostResult) => {
 			if (typeof result === "object") {
-				if (result.error !== undefined) {
-					handle_error(result.error);
+				if ((result as ErrorResult).error) {
+					handle_error((result as ErrorResult).error);
 				} else {
 					let cast_result = result as BlockDivisionStateList;
 					console.debug(cast_result);

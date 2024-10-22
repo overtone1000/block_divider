@@ -3,10 +3,16 @@
 	import { onMount } from "svelte";
 	import { handle_error } from "../commons/commons";
 	import { block_division_post } from "../post/block_division_post";
-	import type { BlockDivisionPost, BlockDivisionPostResult } from "../post/block_division_post";
+	import type {
+		BlockDivisionPost,
+		BlockDivisionPostResult,
+		ErrorResult,
+		StateResult
+	} from "../post/block_division_post";
+	import { get_ranking_as_string } from "../commons/bucket_functions";
 
 	let message: string = "Loading";
-	let view: BlockDivisionState | undefined = undefined;
+	let view: StateResult | undefined = undefined;
 
 	onMount(async () => {
 		const urlParams = new URLSearchParams(window.location.search);
@@ -24,10 +30,10 @@
 
 			let callback = (result: BlockDivisionPostResult) => {
 				if (typeof result === "object") {
-					if (result.error !== undefined) {
-						handle_error(result.error);
+					if ((result as ErrorResult).error) {
+						handle_error((result as ErrorResult).error);
 					} else {
-						view = result as BlockDivisionState;
+						view = result as StateResult;
 						message = JSON.stringify(result);
 						console.debug(message);
 					}
@@ -41,9 +47,37 @@
 
 <Container title="Block Division">
 	<div slot="contents">
-		<div>{message}</div>
+		{#if view == undefined}
+			<div>{message}</div>
+		{:else}
+			<div>{view.id}</div>
+			<table>
+				<tr>
+					<th> </th>
+					{#each view.state.basis.selection_round_names as selection_round, selection_round_index}
+						<th>{selection_round}</th>
+					{/each}
+				</tr>
+				{#each view.state.basis.bucket_definitions as bucket, bucket_index}
+					<tr>
+						<td>{bucket.name}</td>
+						{#each view.state.basis.selection_round_names as selection_round, selection_round_index}
+							<td>{get_ranking_as_string(view, selection_round_index, bucket_index)}</td>
+						{/each}
+					</tr>
+				{/each}
+			</table>
+		{/if}
 	</div>
 </Container>
 
 <style>
+	table,
+	td,
+	th,
+	tr {
+		border-style: solid;
+		border-width: 1px;
+		border-collapse: collapse;
+	}
 </style>

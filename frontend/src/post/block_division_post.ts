@@ -6,8 +6,12 @@ export type BlockDivisionPost =
     { DeleteState: DeleteState } |
     { SendStartEmail: SendStartEmail };
 
+export type ErrorResult = { error: Error };
+export type StateResult = { id: string, state: BlockDivisionState };
 export type BlockDivisionPostResult =
-    { State?: BlockDivisionState, error?: Error } |
+    ErrorResult |
+    BlockDivisionStateList |
+    StateResult |
     boolean;
 
 export let block_division_post = (post: BlockDivisionPost, callback: (result: BlockDivisionPostResult) => void) => {

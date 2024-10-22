@@ -9,6 +9,7 @@
 	import {
 		type BlockDivisionPost,
 		type BlockDivisionPostResult,
+		ErrorResult,
 		block_division_post
 	} from "../../post/block_division_post";
 
@@ -70,8 +71,8 @@
 
 		let callback = (result: BlockDivisionPostResult) => {
 			if (typeof result === "object") {
-				if (result.error !== undefined) {
-					handle_error(result.error);
+				if ((result as ErrorResult).error) {
+					handle_error((result as ErrorResult).error);
 				}
 			} else {
 				if (result) {
@@ -96,8 +97,8 @@
 
 		let callback = (result: BlockDivisionPostResult) => {
 			if (typeof result === "object") {
-				if (result.error !== undefined) {
-					handle_error(result.error);
+				if ((result as ErrorResult).error) {
+					handle_error((result as ErrorResult).error);
 				}
 			} else {
 				if (result) {
@@ -119,8 +120,8 @@
 
 		let callback = (result: BlockDivisionPostResult) => {
 			if (typeof result === "object") {
-				if (result.error !== undefined) {
-					handle_error(result.error);
+				if ((result as ErrorResult).error) {
+					handle_error((result as ErrorResult).error);
 				}
 			} else {
 				console.debug("Would be nice to display confirmation here.");

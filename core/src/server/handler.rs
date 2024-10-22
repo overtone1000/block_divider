@@ -24,8 +24,10 @@ use hyper_services::{
 
 use crate::{
     db::{division::PersistentDivision, key_value::KeyValuePair},
-    server::requests::{block_division_user_view::UserView, BlockDivisionPost},
+    server::{requests::{block_division_user_view::UserView, BlockDivisionPost}, responses::SingleBlockDivisionState},
 };
+
+use super::responses::BlockDivisionServerResponse;
 
 #[derive(Clone)]
 pub struct PostHandler {
@@ -140,7 +142,17 @@ impl PostHandler {
                                     &mut conn,
                                     user_view.get_state_id(),
                                 ) {
-                                    Ok(state) => get_response(state),
+                                    Ok(state) => match state {
+                                        Some(state)=>{
+                                            get_response(Some(SingleBlockDivisionState
+                                                {
+                                                    id:user_view.get_state_id().to_string(),
+                                                    state:state
+                                                }))
+                                        },None=>{
+                                            generic_json_error("No such state")
+                                        }
+                                    },
                                     Err(e) => generic_json_error_from_debug(e),
                                 }
                             }
@@ -243,7 +255,7 @@ fn get_response<T>(
     >,
 >
 where
-    T: Serialize,
+    T: BlockDivisionServerResponse
 {
     match message {
         Some(result) => Response::new(full_to_boxed_body(
