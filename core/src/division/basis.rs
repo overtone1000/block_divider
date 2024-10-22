@@ -41,23 +41,4 @@ impl BlockDivisionBasis {
     pub fn get_participant_definitions(&self) -> &Vec<ParticipantDef> {
         &self.participant_definitions
     }
-
-    pub fn get_bucket_definition(&self, index: BucketIndex) -> &BucketDef {
-        self.bucket_definitions
-            .get(index)
-            .expect("Bucket not found.")
-    }
-
-    pub fn get_participant_definition(&self, index: BucketIndex) -> &ParticipantDef {
-        self.participant_definitions
-            .get(index)
-            .expect("Participant not found.")
-    }
-
-    pub fn get_selection_round_name(&self, index: BucketIndex) -> String {
-        self.selection_round_names
-            .get(index)
-            .expect("Selection round not found.")
-            .to_string()
-    }
 }

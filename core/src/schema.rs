@@ -8,6 +8,13 @@ diesel::table! {
 }
 
 diesel::table! {
+    key_val_store (key) {
+        key -> Text,
+        value -> Text,
+    }
+}
+
+diesel::table! {
     users (email) {
         email -> Text,
         hashed_password -> Nullable<Varchar>,
@@ -17,5 +24,6 @@ diesel::table! {
 
 diesel::allow_tables_to_appear_in_same_query!(
     divisions,
+    key_val_store,
     users,
 );

@@ -11,7 +11,7 @@ mod tests {
 
     #[test]
     fn serialization() {
-        let post = BlockDivisionPost::GetDivisions(GetListRequest {});
+        let post = BlockDivisionPost::GetStates(GetListRequest {});
 
         let serialized = serde_json::to_string_pretty(&post).expect("Should serialize.");
         let deserialized =

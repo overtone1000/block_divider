@@ -33,7 +33,7 @@
 
 	let loadlist = () => {
 		let post: BlockDivisionPost = {
-			GetDivisions: {}
+			GetStates: {}
 		};
 
 		let callback = (result: BlockDivisionPostResult) => {

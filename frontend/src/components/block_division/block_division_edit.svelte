@@ -3,6 +3,7 @@
 	import FormField from "@smui/form-field";
 	import Select, { Option } from "@smui/select";
 	import SaveDiscard from "./save_discard_delete.svelte";
+	import Button, { Label } from "@smui/button";
 
 	import { DisplayMode, handle_error } from "../../commons/commons";
 	import {
@@ -107,6 +108,27 @@
 
 		block_division_post(post, callback);
 	};
+
+	let send_intro_email = (id: number) => {
+		let post: BlockDivisionPost = {
+			SendStartEmail: {
+				user_id: id,
+				state_id: selected_division[0]
+			}
+		};
+
+		let callback = (result: BlockDivisionPostResult) => {
+			if (typeof result === "object") {
+				if (result.error !== undefined) {
+					handle_error(result.error);
+				}
+			} else {
+				console.debug("Would be nice to display confirmation here.");
+			}
+		};
+
+		block_division_post(post, callback);
+	};
 </script>
 
 <div class="outer">
@@ -128,6 +150,21 @@
 				>
 			{/each}
 		</Select>
+
+		{#each block_division.basis.participant_definitions as participant_definition, participant_index}
+			<div class="participant">
+				<div class="participant_name">
+					{participant_definition.name}
+				</div>
+				<Button
+					color="primary"
+					on:click={() => send_intro_email(participant_index)}
+					variant="raised"
+				>
+					<Label>Send Introduction E-mail</Label>
+				</Button>
+			</div>
+		{/each}
 	</div>
 	<SaveDiscard {save_func} {discard_func} {delete_func} />
 </div>
@@ -145,6 +182,16 @@
 		display: flex;
 		flex-direction: column;
 		flex-grow: 1;
+		padding: 20px;
+	}
+	.participant {
+		display: flex;
+		flex-direction: row;
+		padding: 20px;
+		justify-content: flex-start;
+		align-items: center;
+	}
+	.participant_name {
 		padding: 20px;
 	}
 </style>

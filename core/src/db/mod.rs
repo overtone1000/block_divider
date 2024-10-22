@@ -3,6 +3,7 @@ use dotenvy::dotenv;
 use std::env;
 
 pub mod division;
+pub mod key_value;
 pub mod user;
 
 pub fn database_url() -> String {

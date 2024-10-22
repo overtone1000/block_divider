@@ -1,0 +1,4 @@
+
+interface GetUserView {
+    hash: string
+}

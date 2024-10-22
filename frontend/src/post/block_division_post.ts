@@ -1,9 +1,10 @@
 export type BlockDivisionPost =
-    { GetState: GetState } |
-    { GetDivisions: GetDivisions } |
+    { GetUserView: GetUserView } |
+    { GetStates: GetStates } |
     { SetState: SetState } |
     { NewBasis: NewBasis } |
-    { DeleteState: DeleteState };
+    { DeleteState: DeleteState } |
+    { SendStartEmail: SendStartEmail };
 
 export type BlockDivisionPostResult =
     { State?: BlockDivisionState, error?: Error } |

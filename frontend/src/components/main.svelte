@@ -6,19 +6,19 @@
 	import type { BlockDivisionPost, BlockDivisionPostResult } from "../post/block_division_post";
 
 	let message: string = "Loading";
+	let view: BlockDivisionState | undefined = undefined;
 
 	onMount(async () => {
 		const urlParams = new URLSearchParams(window.location.search);
 
 		//Example: localhost:5173/?user_id=test_user_id&division_id=test_division_id
 		console.debug(urlParams);
-		let user_id = urlParams.get("user_id");
-		let division_id = urlParams.get("division_id");
+		let hash = urlParams.get("hash");
 
-		if (user_id !== null && division_id !== null) {
+		if (hash !== null) {
 			let post: BlockDivisionPost = {
-				GetState: {
-					id: division_id
+				GetUserView: {
+					hash: hash
 				}
 			};
 
@@ -27,6 +27,7 @@
 					if (result.error !== undefined) {
 						handle_error(result.error);
 					} else {
+						view = result as BlockDivisionState;
 						message = JSON.stringify(result);
 						console.debug(message);
 					}

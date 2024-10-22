@@ -19,6 +19,10 @@ impl ParticipantDef {
         &self.name
     }
 
+    pub fn get_email(&self) -> &str {
+        &self.email
+    }
+
     pub fn get_round_picks_allowed(&self) -> &Vec<u64> {
         &self.round_picks_allowed
     }
