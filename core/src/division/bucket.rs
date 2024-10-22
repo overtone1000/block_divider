@@ -11,7 +11,6 @@ pub type Designations = BTreeSet<ParticipantIndex>; //Map containing selected pa
 pub type Ranks = BTreeMap<ParticipantIndex, usize>;
 
 pub type BucketIndex = usize;
-pub type BucketName = String;
 pub type AncillaryIndex = usize;
 pub type AncillaryName = String;
 
@@ -19,7 +18,7 @@ pub type AncillaryName = String;
 pub struct BucketDef {
     pub(crate) name: String,
     pub(crate) available_slots: usize, //How many participants can fit in this bucket in total
-    pub(crate) available_ancillaries: BTreeMap<AncillaryIndex, AncillaryName>, //What ancillaries are available to an individual participant in this bucket
+    pub(crate) available_ancillaries: Vec<AncillaryName>, //What ancillaries are available to an individual participant in this bucket
 }
 
 #[derive(Deserialize, Serialize, Debug, Default, PartialEq, Eq)]

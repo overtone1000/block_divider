@@ -17,37 +17,42 @@
 </script>
 
 <div class="outer">
-	<div class="list">
+	<table>
 		{#each Object.keys(list) as block_division_id}
-			<div class="list_row">
-				<div>
+			<tr>
+				<td>
 					{block_division_id}
-				</div>
-				<IconButton
-					on:click={() => {
-						selected_division = to_tuple(block_division_id);
-						set_display_mode(DisplayMode.Modify);
-						return false;
-					}}
-				>
-					<Icon tag="svg" viewBox="0 0 24 24">
-						<path fill="currentColor" d={mdiPencil} />
-					</Icon>
-				</IconButton>
-				<IconButton
-					on:click={() => {
-						selected_division = to_tuple(block_division_id);
-						set_display_mode(DisplayMode.Create);
-						return false;
-					}}
-				>
-					<Icon tag="svg" viewBox="0 0 24 24">
-						<path fill="currentColor" d={mdiContentCopy} />
-					</Icon>
-				</IconButton>
-			</div>
+				</td>
+				<td>
+					<IconButton
+						on:click={() => {
+							selected_division = to_tuple(block_division_id);
+							set_display_mode(DisplayMode.Modify);
+							return false;
+						}}
+					>
+						<Icon tag="svg" viewBox="0 0 24 24">
+							<path fill="currentColor" d={mdiPencil} />
+						</Icon>
+					</IconButton>
+				</td>
+				<td>
+					<IconButton
+						on:click={() => {
+							selected_division = to_tuple(block_division_id);
+							set_display_mode(DisplayMode.Create);
+							return false;
+						}}
+					>
+						<Icon tag="svg" viewBox="0 0 24 24">
+							<path fill="currentColor" d={mdiContentCopy} />
+						</Icon>
+					</IconButton>
+				</td>
+				<td class="table_padding"></td>
+			</tr>
 		{/each}
-	</div>
+	</table>
 	<IconButton on:click={add}>
 		<Icon tag="svg" viewBox="0 0 24 24">
 			<path fill="currentColor" d={mdiPlus} />
@@ -60,13 +65,13 @@
 		display: flex;
 		flex-direction: column;
 	}
-	.list {
-		display: flex;
-		flex-direction: column;
+	table {
+		table-layout: auto;
 	}
-	.list_row {
-		display: flex;
-		flex-direction: row;
-		align-items: center;
+	td {
+		white-space: nowrap;
+	}
+	.table_padding {
+		width: 100%;
 	}
 </style>

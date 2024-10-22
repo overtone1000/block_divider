@@ -16,13 +16,13 @@ pub struct Selection {
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Selections {
-    selections: BTreeMap<RoundIndex, BTreeMap<ParticipantIndex, BTreeSet<Selection>>>,
+    state: BTreeMap<RoundIndex, BTreeMap<ParticipantIndex, BTreeSet<Selection>>>,
 }
 
 impl Selections {
     pub fn new(basis: &BlockDivisionBasis) -> Selections {
         let mut retval = Selections {
-            selections: BTreeMap::new(),
+            state: BTreeMap::new(),
         };
 
         for round in 0..basis.get_selection_rounds().len() {
@@ -33,14 +33,14 @@ impl Selections {
                 participant_selection_map.insert(participant, BTreeSet::new());
             }
 
-            retval.selections.insert(round, participant_selection_map);
+            retval.state.insert(round, participant_selection_map);
         }
 
         retval
     }
 
     pub fn get(&self, round: &usize) -> Option<&BTreeMap<ParticipantIndex, BTreeSet<Selection>>> {
-        self.selections.get(round)
+        self.state.get(round)
     }
 
     pub fn set(
@@ -49,7 +49,7 @@ impl Selections {
         participant: ParticipantIndex,
         selections: BTreeSet<Selection>,
     ) {
-        let round_selections = match self.selections.entry(round) {
+        let round_selections = match self.state.entry(round) {
             std::collections::btree_map::Entry::Vacant(entry) => entry.insert(BTreeMap::new()),
             std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
         };

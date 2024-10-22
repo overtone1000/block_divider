@@ -1,0 +1,3 @@
+interface DeleteState {
+    id: string,
+}

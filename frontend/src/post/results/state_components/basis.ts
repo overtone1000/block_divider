@@ -12,11 +12,11 @@ interface Basis {
 interface BucketDefinition {
     name: string,
     available_slots: number,
-    available_ancillaries: { [ancillary_index: AncillaryIndex]: string },
+    available_ancillaries: string[],
 }
 
 interface ParticipantDefinition {
     name: string,
     email: string,
-    round_picks_allowed: { [round_index: RoundIndex]: number }
+    round_picks_allowed: number[]
 }

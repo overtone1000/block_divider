@@ -2,12 +2,13 @@
 	import Textfield from "@smui/textfield";
 	import { DisplayMode, handle_error } from "../../commons/commons";
 
-	import SaveDiscard from "./save_discard.svelte";
+	import SaveDiscard from "./save_discard_delete.svelte";
 	import {
 		type BlockDivisionPost,
 		type BlockDivisionPostResult,
 		block_division_post
 	} from "../../post/block_division_post";
+	import ModifiableBucketList from "../modifiable_lists/modifiable_bucket_list.svelte";
 
 	export let selected_division: [string, BlockDivisionState] | undefined = undefined;
 	export let set_display_mode: (mode: DisplayMode) => void;
@@ -66,17 +67,12 @@
 
 <div class="outer">
 	<div class="main">
-		<Textfield label="Label" bind:value={id} />
-
-		<div class="area">
+		<div class="toplabel">
+			<Textfield style="width:100%" label="Label" bind:value={id} />
+		</div>
+		<div class="list">
 			Buckets
-			<div class="list">
-				{#each basis.bucket_definitions as bucket_definition}
-					<div class="area">
-						<Textfield label="Bucket Name" bind:value={bucket_definition.name} />
-					</div>
-				{/each}
-			</div>
+			<ModifiableBucketList bucket_definitions={basis.bucket_definitions} />
 		</div>
 
 		<div class="area">
@@ -122,7 +118,7 @@
 	<SaveDiscard {save_func} {discard_func} />
 </div>
 
-<style>
+<style lang="scss">
 	.outer {
 		height: 100%;
 		width: 100%;
@@ -133,6 +129,7 @@
 		flex-shrink: 1;
 		overflow: auto;
 	}
+
 	.area {
 		margin: 10px;
 		padding: 10px;
@@ -140,6 +137,7 @@
 		border-style: solid;
 		border-radius: 10px;
 	}
+
 	.row {
 		display: flex;
 		flex-direction: row;

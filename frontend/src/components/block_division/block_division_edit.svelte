@@ -2,7 +2,7 @@
 	import Switch from "@smui/switch";
 	import FormField from "@smui/form-field";
 	import Select, { Option } from "@smui/select";
-	import SaveDiscard from "./save_discard.svelte";
+	import SaveDiscard from "./save_discard_delete.svelte";
 
 	import { DisplayMode, handle_error } from "../../commons/commons";
 	import {
@@ -85,6 +85,28 @@
 	let discard_func = () => {
 		set_display_mode(DisplayMode.List);
 	};
+
+	let delete_func = () => {
+		let post: BlockDivisionPost = {
+			DeleteState: {
+				id: selected_division[0]
+			}
+		};
+
+		let callback = (result: BlockDivisionPostResult) => {
+			if (typeof result === "object") {
+				if (result.error !== undefined) {
+					handle_error(result.error);
+				}
+			} else {
+				if (result) {
+					set_display_mode(DisplayMode.List);
+				}
+			}
+		};
+
+		block_division_post(post, callback);
+	};
 </script>
 
 <div class="outer">
@@ -107,7 +129,7 @@
 			{/each}
 		</Select>
 	</div>
-	<SaveDiscard {save_func} {discard_func} />
+	<SaveDiscard {save_func} {discard_func} {delete_func} />
 </div>
 
 <style>

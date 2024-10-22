@@ -17,9 +17,7 @@ use crate::db::division::PersistentDivision;
 
 use super::{
     basis::BlockDivisionBasis,
-    bucket::{
-        self, BucketDef, BucketIndex, BucketName, BucketState, BucketStates, Ranks, RoundStates,
-    },
+    bucket::{self, BucketDef, BucketIndex, BucketState, BucketStates, Ranks, RoundStates},
     participant::{ParticipantDef, ParticipantIndex},
     round::{RoundIndex, RoundName},
     selections::{Selection, Selections},
@@ -75,7 +73,7 @@ impl BlockDivisionState {
             .get(participant_index)
             .expect("Participant should exist.")
             .get_round_picks_allowed()
-            .get(&round)
+            .get(round)
             .expect("Round should exist.");
 
         match self.current_open_round {
@@ -385,7 +383,7 @@ mod tests {
                 BucketDef {
                     name: bucketname(n),
                     available_slots: 5,
-                    available_ancillaries: BTreeMap::from([(0, BLACK_BUTTE.1.to_string())]),
+                    available_ancillaries: Vec::from([(BLACK_BUTTE.1.to_string())]),
                 },
             );
         }
@@ -397,8 +395,7 @@ mod tests {
             ROUND_4.1.to_string(),
         ]);
 
-        let mut round_picks: BTreeMap<RoundIndex, u64> = BTreeMap::new();
-        round_picks.insert(0, 3);
+        let mut round_picks: Vec<u64> = Vec::new();
         for n in 0..rounds.len() {
             round_picks.insert(n, 1);
         }

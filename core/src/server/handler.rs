@@ -133,6 +133,18 @@ impl PostHandler {
 
                         get_response(Some(res))
                     }
+                    BlockDivisionPost::DeleteState(delete_state_request) => {
+                        println!("Delete division.");
+                        let res = match PersistentDivision::delete_division(
+                            &mut conn,
+                            delete_state_request.get_id().to_string(),
+                        ) {
+                            Ok(_) => true,
+                            Err(_) => false,
+                        };
+
+                        get_response(Some(res))
+                    }
                 },
                 Err(err) => generic_json_error_from_debug(err),
             }
