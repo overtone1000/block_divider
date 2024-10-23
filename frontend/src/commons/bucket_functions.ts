@@ -4,14 +4,37 @@ export let get_participant_name = (view: StateResult, participant_index: number)
     return view.state.basis.participant_definitions[participant_index].name;
 };
 
-export let get_designations_summary = (view: StateResult, round_index: number, bucket_index: number) => {
-    let designations =
-        view.state.bucket_states[bucket_index].round_states[round_index].designations;
-    let ancillary_designations =
-        view.state.bucket_states[bucket_index].round_states[round_index].ancillary_designations;
+export let get_ancillary_name = (view: StateResult, bucket_index: number, ancillary_index: number) => {
+    return view.state.basis.bucket_definitions[bucket_index].available_ancillaries[ancillary_index];
+}
+
+export let get_designations = (view: StateResult, round_index: number, bucket_index: number) => {
+    let designations = view.state.bucket_states[bucket_index].round_states[round_index].designations;
+
+    let retval: string[] = [];
+    for (let participant_index of designations) {
+        let name: string = get_participant_name(view, participant_index);
+        retval.push(name);
+    }
+
+    return retval;
 };
 
-export let get_ranking_as_string = (view: StateResult, round_index: number, bucket_index: number) => {
+export let get_ancillary_designations = (view: StateResult, round_index: number, bucket_index: number) => {
+    let designations = view.state.bucket_states[bucket_index].round_states[round_index].ancillary_designations;
+
+    let retval: string[] = [];
+    for (let ancillary_index in designations) {
+        let ancillary_name = get_ancillary_name(view, bucket_index, parseInt(ancillary_index));
+        let participant_index = designations[ancillary_index];
+        let participant_name: string = get_participant_name(view, participant_index);
+        retval.push(ancillary_name + ": " + participant_name);
+    }
+
+    return retval;
+}
+
+export let get_sorted_rankings = (view: StateResult, round_index: number, bucket_index: number) => {
     let ranks = view.state.bucket_states[bucket_index].round_states[round_index].ranks;
 
     let map: Map<number, string> = new Map();
@@ -21,12 +44,12 @@ export let get_ranking_as_string = (view: StateResult, round_index: number, buck
         map.set(rank, name);
     }
 
-    let retval = "";
+    let retval: string[] = [];
     let sorted_keys = map.keys().toArray().sort();
     for (let key of sorted_keys) {
-        retval = retval + key + ": " + map.get(key) + " ";
+        let name: string = map.get(key) as string;
+        retval.push(name);
     }
 
-    console.debug(retval);
     return retval;
 };
