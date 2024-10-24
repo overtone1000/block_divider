@@ -1,15 +1,20 @@
 <script lang="ts">
 	import Textfield from "@smui/textfield";
-	import { DisplayMode, handle_error } from "../../commons/commons";
 
 	import SaveDiscard from "./save_discard_delete.svelte";
 	import {
 		type BlockDivisionPost,
 		type BlockDivisionPostResult,
-		ErrorResult,
+		type ErrorResult,
 		block_division_post
 	} from "../../post/block_division_post";
+	import type {
+		BlockDivisionState,
+		BlockDivisionStateList
+	} from "../../post/results/block_division_state";
 	import ModifiableBucketList from "../modifiable_lists/modifiable_bucket_list.svelte";
+	import { DisplayMode, handle_error } from "../../commons/commons";
+	import type { Basis } from "../../post/results/state_components/basis";
 
 	export let selected_division: [string, BlockDivisionState] | undefined = undefined;
 	export let set_display_mode: (mode: DisplayMode) => void;

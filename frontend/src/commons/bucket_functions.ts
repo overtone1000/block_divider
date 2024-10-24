@@ -1,14 +1,14 @@
-import { type StateResult } from "../post/block_division_post";
+import { type UserViewResult } from "../post/block_division_post";
 
-export let get_participant_name = (view: StateResult, participant_index: number) => {
+export let get_participant_name = (view: UserViewResult, participant_index: number) => {
     return view.state.basis.participant_definitions[participant_index].name;
 };
 
-export let get_ancillary_name = (view: StateResult, bucket_index: number, ancillary_index: number) => {
+export let get_ancillary_name = (view: UserViewResult, bucket_index: number, ancillary_index: number) => {
     return view.state.basis.bucket_definitions[bucket_index].available_ancillaries[ancillary_index];
 }
 
-export let get_designations = (view: StateResult, round_index: number, bucket_index: number) => {
+export let get_designations = (view: UserViewResult, round_index: number, bucket_index: number) => {
     let designations = view.state.bucket_states[bucket_index].round_states[round_index].designations;
 
     let retval: string[] = [];
@@ -20,7 +20,7 @@ export let get_designations = (view: StateResult, round_index: number, bucket_in
     return retval;
 };
 
-export let get_ancillary_designations = (view: StateResult, round_index: number, bucket_index: number) => {
+export let get_ancillary_designations = (view: UserViewResult, round_index: number, bucket_index: number) => {
     let designations = view.state.bucket_states[bucket_index].round_states[round_index].ancillary_designations;
 
     let retval: string[] = [];
@@ -34,8 +34,13 @@ export let get_ancillary_designations = (view: StateResult, round_index: number,
     return retval;
 }
 
-export let get_sorted_rankings = (view: StateResult, round_index: number, bucket_index: number) => {
+export let get_sorted_rankings = (view: UserViewResult, round_index: number, bucket_index: number) => {
     let ranks = view.state.bucket_states[bucket_index].round_states[round_index].ranks;
+    let retval: string[] = [];
+
+    if (ranks === null) {
+        return retval;
+    }
 
     let map: Map<number, string> = new Map();
     for (let participant_index in ranks) {
@@ -44,7 +49,7 @@ export let get_sorted_rankings = (view: StateResult, round_index: number, bucket
         map.set(rank, name);
     }
 
-    let retval: string[] = [];
+
     let sorted_keys = map.keys().toArray().sort();
     for (let key of sorted_keys) {
         let name: string = map.get(key) as string;

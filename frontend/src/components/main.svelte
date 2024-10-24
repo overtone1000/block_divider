@@ -11,16 +11,17 @@
 		BlockDivisionPost,
 		BlockDivisionPostResult,
 		ErrorResult,
-		StateResult
+		UserViewResult
 	} from "../post/block_division_post";
 	import {
 		get_ancillary_designations,
 		get_designations,
 		get_sorted_rankings
 	} from "../commons/bucket_functions";
+	import type { BlockDivisionSelection } from "../post/results/block_division_state";
 
 	let message: string = "Loading";
-	let view: StateResult | undefined = undefined;
+	let view: UserViewResult | undefined = undefined;
 
 	onMount(async () => {
 		const urlParams = new URLSearchParams(window.location.search);
@@ -41,7 +42,7 @@
 					if ((result as ErrorResult).error) {
 						handle_error((result as ErrorResult).error);
 					} else {
-						view = result as StateResult;
+						view = result as UserViewResult;
 						message = JSON.stringify(result);
 						console.debug(message);
 					}
@@ -52,29 +53,40 @@
 		}
 	});
 
-	interface Selection{
-		bucket_id:number;
-		ancillary_ids:number[];
-	}
-	let selections:[];
-	if(view!==undefined)
-	{
-		NEED USER ID Headers, MUST ADD TO POST RESPONSE
-		for(let n=0;n<view.state.basis.participant_definitions[view.];n++)
-	{
+	let selections: BlockDivisionSelection[] = [];
 
-	}
+	$: {
+		console.debug("View:", view);
+		if (view !== undefined) {
+			selections = [];
+			let current_open_round = view.state.current_open_round;
+			console.debug("Current open round:", current_open_round);
+			if (current_open_round !== null) {
+				let picks_allowed =
+					view.state.basis.participant_definitions[view.user_id].round_picks_allowed[
+						current_open_round
+					];
+				console.debug("Picks allowed:", picks_allowed);
+				let current_selections = view.state.selections.state[current_open_round][view.user_id];
+				if (current_selections.length !== picks_allowed) {
+					console.error("Backend error. Picks allowed !== current selections array length.");
+				}
+				selections = current_selections;
+			}
+		} else {
+			selections = [];
+		}
 	}
 </script>
 
 <Container title="Block Division">
 	<div slot="contents">
-		{#if view == undefined}
+		{#if view === undefined}
 			<div>{message}</div>
 		{:else}
 			<table>
 				<tr>
-					<th> {view.id}</th>
+					<th> {view.state_id}</th>
 					{#each view.state.basis.selection_round_names as selection_round, selection_round_index}
 						<th>{selection_round}</th>
 					{/each}
@@ -95,30 +107,39 @@
 											<ul>{ancillary_designation}</ul>
 										{/each}
 									</div>
-									<Wrapper rich>
-										<Fab on:click={() => {}} mini>
-											<Icon tag="svg" viewBox="0 0 24 24" on>
-												<path fill="currentColor" d={mdiOrderNumericAscending} />
-											</Icon>
-										</Fab>
-										<Tooltip>
-											<Content
-												><div>
-													<ol>
-														{#each get_sorted_rankings(view, selection_round_index, bucket_index) as ranking}
-															<li>{ranking}</li>
-														{/each}
-													</ol>
-												</div></Content
-											></Tooltip
-										>
-									</Wrapper>
+									{#if view.state.bucket_states[bucket_index].round_states[selection_round_index].ranks !== null}
+										<Wrapper rich>
+											<Fab on:click={() => {}} mini>
+												<Icon tag="svg" viewBox="0 0 24 24" on>
+													<path fill="currentColor" d={mdiOrderNumericAscending} />
+												</Icon>
+											</Fab>
+											<Tooltip>
+												<Content
+													><div>
+														<ol>
+															{#each get_sorted_rankings(view, selection_round_index, bucket_index) as ranking}
+																<li>{ranking}</li>
+															{/each}
+														</ol>
+													</div></Content
+												></Tooltip
+											>
+										</Wrapper>
+									{/if}
 								</div>
 							</td>
 						{/each}
 					</tr>
 				{/each}
 			</table>
+			{#if selections.length > 0}
+				<div>
+					{#each selections as selection, selection_index}
+						Selection {selection_index}
+					{/each}
+				</div>
+			{/if}
 		{/if}
 	</div>
 </Container>

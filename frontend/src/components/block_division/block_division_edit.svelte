@@ -4,12 +4,15 @@
 	import Select, { Option } from "@smui/select";
 	import SaveDiscard from "./save_discard_delete.svelte";
 	import Button, { Label } from "@smui/button";
-
+	import {
+		type BlockDivisionState,
+		type BlockDivisionStateList
+	} from "../../post/results/block_division_state";
 	import { DisplayMode, handle_error } from "../../commons/commons";
 	import {
 		type BlockDivisionPost,
 		type BlockDivisionPostResult,
-		ErrorResult,
+		type ErrorResult,
 		block_division_post
 	} from "../../post/block_division_post";
 

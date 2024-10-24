@@ -2,6 +2,10 @@
 	import IconButton, { Icon } from "@smui/icon-button";
 	import { mdiPlus, mdiPencil, mdiContentCopy } from "@mdi/js";
 	import { DisplayMode } from "../../commons/commons";
+	import type {
+		BlockDivisionState,
+		BlockDivisionStateList
+	} from "../../post/results/block_division_state";
 
 	export let list: BlockDivisionStateList;
 	export let selected_division: [string, BlockDivisionState] | undefined = undefined;

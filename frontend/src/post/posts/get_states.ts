@@ -1,3 +1,3 @@
 
-interface GetStates {
+export interface GetStates {
 }

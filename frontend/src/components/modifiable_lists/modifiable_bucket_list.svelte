@@ -3,6 +3,7 @@
 	import ModifiableStringList from "./modifiable_string_list.svelte";
 	import ModifiableListContainer from "./modifiable_list_container.svelte";
 	import ModifiableListDeleteButton from "./modifiable_list_delete_button.svelte";
+	import type { BucketDefinition } from "../../post/results/state_components/basis";
 	export let bucket_definitions: BucketDefinition[];
 
 	console.debug(bucket_definitions);

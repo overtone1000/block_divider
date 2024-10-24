@@ -1,3 +1,11 @@
+import type { DeleteState } from "./posts/delete_state";
+import type { GetStates } from "./posts/get_states";
+import type { GetUserView } from "./posts/get_user_view";
+import type { NewBasis } from "./posts/new_basis";
+import type { SendStartEmail } from "./posts/send_start_email";
+import type { SetState } from "./posts/set_state";
+import type { BlockDivisionState, BlockDivisionStateList } from "./results/block_division_state";
+
 export type BlockDivisionPost =
     { GetUserView: GetUserView } |
     { GetStates: GetStates } |
@@ -7,11 +15,11 @@ export type BlockDivisionPost =
     { SendStartEmail: SendStartEmail };
 
 export type ErrorResult = { error: Error };
-export type StateResult = { id: string, state: BlockDivisionState };
+export type UserViewResult = { user_id: number, state_id: string, state: BlockDivisionState };
 export type BlockDivisionPostResult =
     ErrorResult |
     BlockDivisionStateList |
-    StateResult |
+    UserViewResult |
     boolean;
 
 export let block_division_post = (post: BlockDivisionPost, callback: (result: BlockDivisionPostResult) => void) => {

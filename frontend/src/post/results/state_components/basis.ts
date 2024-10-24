@@ -1,21 +1,21 @@
-type BucketIndex = number;
-type ParticipantIndex = number;
-type RoundIndex = number;
-type AncillaryIndex = number;
+export type BucketIndex = number;
+export type ParticipantIndex = number;
+export type RoundIndex = number;
+export type AncillaryIndex = number;
 
-interface Basis {
+export interface Basis {
     bucket_definitions: BucketDefinition[],
     participant_definitions: ParticipantDefinition[],
     selection_round_names: string[],
 }
 
-interface BucketDefinition {
+export interface BucketDefinition {
     name: string,
     available_slots: number,
     available_ancillaries: string[],
 }
 
-interface ParticipantDefinition {
+export interface ParticipantDefinition {
     name: string,
     email: string,
     round_picks_allowed: number[]

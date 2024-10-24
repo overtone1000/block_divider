@@ -2,15 +2,19 @@
 	import Container from "./container.svelte";
 	import { onMount } from "svelte";
 	import BlockDivisionEdit from "./block_division/block_division_edit.svelte";
-	import { DisplayMode } from "../commons/commons";
 	import BlockDivisionCreate from "./block_division/block_division_create.svelte";
 	import BlockDivisionList from "./block_division/block_division_list.svelte";
 	import {
 		block_division_post,
-		ErrorResult,
+		type ErrorResult,
 		type BlockDivisionPost,
 		type BlockDivisionPostResult
 	} from "../post/block_division_post";
+	import type {
+		BlockDivisionState,
+		BlockDivisionStateList
+	} from "../post/results/block_division_state";
+	import { DisplayMode } from "../commons/commons";
 
 	let message = "Loading...";
 	let list: BlockDivisionStateList | undefined = undefined;

@@ -23,7 +23,7 @@ use super::{
     selections::{Selection, Selections},
 };
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct BlockDivisionState {
     pub basis: BlockDivisionBasis,
     pub bucket_states: BucketStates,
@@ -59,12 +59,12 @@ impl BlockDivisionState {
         retval
     }
 
-    pub fn input_selection(
+    pub fn set_selections(
         &mut self,
         id: String,
         conn: &mut PgConnection,
         participant_index: ParticipantIndex,
-        selections: BTreeSet<Selection>,
+        selections: Vec<Option<Selection>>,
         round: usize,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let pick_count = self
@@ -78,7 +78,7 @@ impl BlockDivisionState {
 
         match self.current_open_round {
             Some(current_open_round) => {
-                if selections.len() > (*pick_count as usize) {
+                if selections.len() != (*pick_count as usize) {
                     Err(Box::new(std::io::Error::new(
                         std::io::ErrorKind::InvalidInput,
                         format!(
@@ -121,15 +121,23 @@ impl BlockDivisionState {
                 Some(participant_selections_map) => {
                     for (participant, selections) in participant_selections_map {
                         for selection in selections.iter() {
-                            selections_to_attempt.push((
-                                round,
-                                participant.clone(),
-                                selection.clone(),
-                            ));
+                            match selection {
+                                Some(selection) => {
+                                    selections_to_attempt.push((
+                                        round,
+                                        participant.clone(),
+                                        selection.clone(),
+                                    ));
+                                }
+                                None => { //Do Nothing}
+                                }
+                            }
                         }
                     }
                 }
-                None => {}
+                None => {
+                    eprintln!("Empty selections value.");
+                }
             };
         }
 
@@ -218,7 +226,7 @@ impl BlockDivisionState {
                     */
                 }
 
-                bucket.get_state_mut(&round).ranks = bucket_state_this_round;
+                bucket.get_state_mut(&round).ranks = Some(bucket_state_this_round);
             }
         }
     }
@@ -370,6 +378,8 @@ mod tests {
     const ROUND_3: (usize, &str) = (2, "Round 2");
     const ROUND_4: (usize, &str) = (3, "Round 3");
 
+    const PICKS_PER_ROUND: usize = 1;
+
     fn bucketname(i: usize) -> String {
         "Bucket ".to_string() + &i.to_string()
     }
@@ -395,9 +405,9 @@ mod tests {
             ROUND_4.1.to_string(),
         ]);
 
-        let mut round_picks: Vec<u64> = Vec::new();
+        let mut round_picks: Vec<usize> = Vec::new();
         for n in 0..rounds.len() {
-            round_picks.insert(n, 1);
+            round_picks.insert(n, PICKS_PER_ROUND);
         }
 
         let mut participants: Vec<ParticipantDef> = Vec::new();
@@ -488,19 +498,21 @@ mod tests {
 
         let current_round_index = ROUND_1.0;
 
-        let mut selections_a: BTreeSet<Selection> = BTreeSet::new();
+        let mut selections_a: Vec<Option<Selection>> = Vec::new();
         let mut ancillaries_a: BTreeSet<AncillaryIndex> = BTreeSet::new();
         ancillaries_a.insert(BLACK_BUTTE.0);
 
-        selections_a.insert(Selection {
-            bucket_index: current_bucket_index,
-            ancillaries: ancillaries_a,
-        });
+        for n in 0..PICKS_PER_ROUND {
+            selections_a.push(Some(Selection {
+                bucket_index: current_bucket_index,
+                ancillaries: ancillaries_a.clone(),
+            }));
+        }
 
         bds.set_open_round(pd.get_id(), Some(current_round_index), &mut conn)
             .expect("Couldn't set open round.");
 
-        bds.input_selection(
+        bds.set_selections(
             pd.get_id(),
             &mut conn,
             participant_index,

@@ -11,7 +11,7 @@ pub type ParticipantIndex = usize;
 pub struct ParticipantDef {
     name: String,
     email: String,
-    round_picks_allowed: Vec<u64>,
+    round_picks_allowed: Vec<usize>,
 }
 
 impl ParticipantDef {
@@ -23,11 +23,11 @@ impl ParticipantDef {
         &self.email
     }
 
-    pub fn get_round_picks_allowed(&self) -> &Vec<u64> {
+    pub fn get_round_picks_allowed(&self) -> &Vec<usize> {
         &self.round_picks_allowed
     }
 
-    pub fn create(name: String, email: String, round_picks_allowed: Vec<u64>) -> ParticipantDef {
+    pub fn create(name: String, email: String, round_picks_allowed: Vec<usize>) -> ParticipantDef {
         ParticipantDef {
             name: name,
             email: email,

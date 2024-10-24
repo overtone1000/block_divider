@@ -1,3 +1,3 @@
-interface DeleteState {
+export interface DeleteState {
     id: string,
 }

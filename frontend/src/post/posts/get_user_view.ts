@@ -1,4 +1,4 @@
 
-interface GetUserView {
+export interface GetUserView {
     hash: string
 }

@@ -14,9 +14,9 @@ pub struct Selection {
     pub(crate) ancillaries: BTreeSet<usize>, //this is where Black Butte will go but opens it to other possibilities
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, PartialOrd, Ord, Clone)]
 pub struct Selections {
-    state: BTreeMap<RoundIndex, BTreeMap<ParticipantIndex, BTreeSet<Selection>>>,
+    state: BTreeMap<RoundIndex, BTreeMap<ParticipantIndex, Vec<Option<Selection>>>>,
 }
 
 impl Selections {
@@ -26,11 +26,22 @@ impl Selections {
         };
 
         for round in 0..basis.get_selection_rounds().len() {
-            let mut participant_selection_map: BTreeMap<ParticipantIndex, BTreeSet<Selection>> =
+            let mut participant_selection_map: BTreeMap<ParticipantIndex, Vec<Option<Selection>>> =
                 BTreeMap::new();
 
             for participant in 0..basis.get_participant_definitions().len() {
-                participant_selection_map.insert(participant, BTreeSet::new());
+                let part_def = basis
+                    .get_participant_definitions()
+                    .get(participant)
+                    .expect("Should exist.");
+                let selections_allowed_this_round = part_def
+                    .get_round_picks_allowed()
+                    .get(round)
+                    .expect("Should exist.");
+                participant_selection_map.insert(
+                    participant,
+                    Vec::with_capacity(*selections_allowed_this_round),
+                );
             }
 
             retval.state.insert(round, participant_selection_map);
@@ -39,7 +50,10 @@ impl Selections {
         retval
     }
 
-    pub fn get(&self, round: &usize) -> Option<&BTreeMap<ParticipantIndex, BTreeSet<Selection>>> {
+    pub fn get(
+        &self,
+        round: &usize,
+    ) -> Option<&BTreeMap<ParticipantIndex, Vec<Option<Selection>>>> {
         self.state.get(round)
     }
 
@@ -47,7 +61,7 @@ impl Selections {
         &mut self,
         round: usize,
         participant: ParticipantIndex,
-        selections: BTreeSet<Selection>,
+        selections: Vec<Option<Selection>>,
     ) {
         let round_selections = match self.state.entry(round) {
             std::collections::btree_map::Entry::Vacant(entry) => entry.insert(BTreeMap::new()),

@@ -21,11 +21,11 @@ pub struct BucketDef {
     pub(crate) available_ancillaries: Vec<AncillaryName>, //What ancillaries are available to an individual participant in this bucket
 }
 
-#[derive(Deserialize, Serialize, Debug, Default, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Default, PartialEq, Eq, Clone)]
 pub struct BucketState {
     pub(crate) designations: Designations, //Who is in this bucket in each round (0 is predesignation, 1 is round 1, 2 is round 2, etc.)
     pub(crate) ancillary_designations: BTreeMap<AncillaryIndex, ParticipantIndex>,
-    pub(crate) ranks: Ranks, //Map containing the ranks for each participant for each potential round
+    pub(crate) ranks: Option<Ranks>, //Map containing the ranks for each participant for each potential round, make an option to allow frontend censoring
 }
 
 impl BucketState {
@@ -33,7 +33,7 @@ impl BucketState {
         BucketState {
             designations: Designations::new(),
             ancillary_designations: BTreeMap::new(),
-            ranks: Ranks::new(),
+            ranks: Some(Ranks::new()),
         }
     }
 
@@ -44,7 +44,7 @@ impl BucketState {
     ) -> BTreeSet<ParticipantIndex> {
         let mut map: BTreeMap<&usize, ParticipantIndex> = BTreeMap::new(); //automatically sorted by key
         for candidate in candidates {
-            let rank = self.ranks.get(candidate).expect("Should exist.");
+            let rank = self.get_rank(candidate);
             map.insert(rank, *candidate);
         }
 
@@ -59,14 +59,20 @@ impl BucketState {
         retval
     }
 
+    pub(crate) fn get_rank(&self, participant: &ParticipantIndex) -> &ParticipantIndex {
+        self.ranks
+            .as_ref()
+            .expect("Should always be some. None is only used for frontend censoring")
+            .get(participant)
+            .expect("Should always exist.")
+    }
+
     pub(crate) fn is_winner(
         &self,
         contender: &ParticipantIndex,
         opponent: &ParticipantIndex,
     ) -> bool {
-        if self.ranks.get(contender).expect("Should exist")
-            > self.ranks.get(opponent).expect("Should exist")
-        {
+        if self.get_rank(contender) > self.get_rank(opponent) {
             false
         } else {
             true
@@ -74,7 +80,7 @@ impl BucketState {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct RoundStates {
     round_states: Vec<BucketState>, //the state of each round in this bucket
 }
@@ -116,6 +122,14 @@ impl RoundStates {
 
     pub fn get_state_mut(&mut self, round: &usize) -> &mut BucketState {
         self.round_states.get_mut(*round).expect("Should exist.")
+    }
+
+    pub fn get_states(&self) -> &Vec<BucketState> {
+        &self.round_states
+    }
+
+    pub fn get_states_mut(&mut self) -> &mut Vec<BucketState> {
+        &mut self.round_states
     }
 
     pub fn selection_result(

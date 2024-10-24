@@ -23,8 +23,7 @@ use hyper_services::{
 };
 
 use crate::{
-    db::{division::PersistentDivision, key_value::KeyValuePair},
-    server::{requests::{block_division_user_view::UserView, BlockDivisionPost}, responses::SingleBlockDivisionState},
+    db::{division::PersistentDivision, key_value::KeyValuePair}, division::bucket, server::{requests::{block_division_user_view::UserView, BlockDivisionPost}, responses::SingleBlockDivisionState}
 };
 
 use super::responses::BlockDivisionServerResponse;
@@ -143,10 +142,31 @@ impl PostHandler {
                                     user_view.get_state_id(),
                                 ) {
                                     Ok(state) => match state {
-                                        Some(state)=>{
+                                        Some(mut state)=>{
+                                            //Censor the final state
+                                            let start = match state.current_open_round
+                                            {
+                                                Some(start)=>{
+                                                    start+1
+                                                },
+                                                None=>{
+                                                    0
+                                                }
+                                            };
+                                            let fin =state.basis.get_selection_rounds().len();
+                                            println!("Censoring rounds {} - {}",start,fin-1);
+                                            for bucket_state in &mut state.bucket_states
+                                            {
+                                                for round in start..fin
+                                                {
+                                                    bucket_state.get_state_mut(&round).ranks=None;
+                                                }
+                                            }
+
                                             get_response(Some(SingleBlockDivisionState
                                                 {
-                                                    id:user_view.get_state_id().to_string(),
+                                                    user_id:user_view.get_user_id(),
+                                                    state_id:user_view.get_state_id().to_string(),
                                                     state:state
                                                 }))
                                         },None=>{
