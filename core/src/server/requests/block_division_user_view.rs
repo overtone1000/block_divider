@@ -23,6 +23,12 @@ pub(crate) struct UserView {
 }
 
 impl UserView {
+    pub fn create(user_id: i32, state_id: String) -> UserView {
+        UserView {
+            user_id: user_id,
+            state_id: state_id,
+        }
+    }
     pub fn get_state_id(&self) -> &str {
         &self.state_id
     }
@@ -55,7 +61,7 @@ impl UserView {
     }
 
     pub fn set(&self, conn: &mut PgConnection) -> Result<(), Box<dyn std::error::Error>> {
-        match KeyValuePair::set(conn, &self.get_hash(), Some(self.as_json())) {
+        match KeyValuePair::set(conn, &self.get_hash(), Some(self.as_json()), false) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
         }

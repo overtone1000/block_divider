@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { mdiOrderNumericAscending } from "@mdi/js";
 	import Tooltip, { Wrapper, Content } from "@smui/tooltip";
+	import Select, { Option } from "@smui/select";
 	import { Icon } from "@smui/icon-button";
 	import Fab from "@smui/fab";
 	import Container from "./container.svelte";
@@ -18,34 +19,35 @@
 		get_designations,
 		get_sorted_rankings
 	} from "../commons/bucket_functions";
-	import type { BlockDivisionSelection } from "../post/results/block_division_state";
+	import type { BlockDivisionSelectionEntry } from "../post/results/block_division_state";
+	import Switch from "@smui/switch";
+	import FormField from "@smui/form-field";
+	import Checkbox from "@smui/checkbox";
+	import Button from "@smui/button";
 
 	let message: string = "Loading";
 	let view: UserViewResult | undefined = undefined;
+	let urlhash: string | null = null;
+
+	let callback = (result: BlockDivisionPostResult) => {
+		if (typeof result === "object") {
+			if ((result as ErrorResult).error) {
+				handle_error((result as ErrorResult).error);
+			} else {
+				view = result as UserViewResult;
+				message = JSON.stringify(result);
+				console.debug(message);
+			}
+		}
+	};
 
 	onMount(async () => {
 		const urlParams = new URLSearchParams(window.location.search);
-
-		//Example: localhost:5173/?user_id=test_user_id&division_id=test_division_id
-		console.debug(urlParams);
-		let hash = urlParams.get("hash");
-
-		if (hash !== null) {
+		urlhash = urlParams.get("hash");
+		if (urlhash !== null) {
 			let post: BlockDivisionPost = {
 				GetUserView: {
-					hash: hash
-				}
-			};
-
-			let callback = (result: BlockDivisionPostResult) => {
-				if (typeof result === "object") {
-					if ((result as ErrorResult).error) {
-						handle_error((result as ErrorResult).error);
-					} else {
-						view = result as UserViewResult;
-						message = JSON.stringify(result);
-						console.debug(message);
-					}
+					hash: urlhash
 				}
 			};
 
@@ -53,7 +55,29 @@
 		}
 	});
 
-	let selections: BlockDivisionSelection[] = [];
+	let selections: BlockDivisionSelectionEntry[] = [];
+
+	let submit = () => {
+		if (view !== undefined) {
+			let post: BlockDivisionPost = {
+				SubmitSelections: {
+					user_id: view.user_id,
+					state_id: view.state_id,
+					selections: selections
+				}
+			};
+
+			block_division_post(post, callback);
+		}
+	};
+
+	let bucket_id_keyfunc = (bucket_id: number) => {
+		if (view === undefined) {
+			return "";
+		} else {
+			return view.state.basis.bucket_definitions[bucket_id].name;
+		}
+	};
 
 	$: {
 		console.debug("View:", view);
@@ -66,8 +90,9 @@
 					view.state.basis.participant_definitions[view.user_id].round_picks_allowed[
 						current_open_round
 					];
-				console.debug("Picks allowed:", picks_allowed);
 				let current_selections = view.state.selections.state[current_open_round][view.user_id];
+				console.debug("Picks allowed:", picks_allowed);
+				console.debug("Current selections:", current_selections);
 				if (current_selections.length !== picks_allowed) {
 					console.error("Backend error. Picks allowed !== current selections array length.");
 				}
@@ -134,10 +159,69 @@
 				{/each}
 			</table>
 			{#if selections.length > 0}
-				<div>
-					{#each selections as selection, selection_index}
-						Selection {selection_index}
-					{/each}
+				<div class="selections">
+					{#if view.state.current_open_round !== null}
+						{#each selections as selection, selection_index}
+							<div class="selection">
+								<FormField
+									align="end"
+									on:SMUISwitch:change={(_e) => {
+										if (selection === null) {
+											selection = {
+												bucket_index: 0,
+												ancillaries: []
+											};
+										} else {
+											selection = null;
+										}
+										selections = selections;
+									}}
+								>
+									<Switch checked={selection !== null} />
+									<span slot="label"
+										>{view.state.basis.selection_round_names[view.state.current_open_round]}
+										selection {selection_index + 1}</span
+									>
+								</FormField>
+								{#if selection !== null}
+									<Select
+										key={bucket_id_keyfunc}
+										bind:value={selection.bucket_index}
+										label="Selection"
+									>
+										{#each view.state.basis.bucket_definitions as bucket_definition, bucket_index}
+											<Option value={bucket_index}>{bucket_definition.name}</Option>
+										{/each}
+									</Select>
+									{#each view.state.basis.bucket_definitions[selection.bucket_index].available_ancillaries as available_ancillary, ancillary_index}
+										<FormField align="end">
+											<Checkbox
+												checked={selection.ancillaries.includes(ancillary_index)}
+												on:click={() => {
+													if (selection?.ancillaries.includes(ancillary_index)) {
+														selection?.ancillaries.splice(
+															selection?.ancillaries.indexOf(ancillary_index),
+															1
+														);
+													} else {
+														selection?.ancillaries.push(ancillary_index);
+													}
+												}}
+											/>
+											<span slot="label">{available_ancillary}</span>
+										</FormField>
+									{/each}
+								{:else}
+									<Select disabled={true} label="Selection"></Select>
+								{/if}
+							</div>
+						{/each}
+						<Button on:click={submit} variant="raised">Submit</Button>
+					{:else}
+						<div>
+							Selections for {view.state_id} are current closed.
+						</div>
+					{/if}
 				</div>
 			{/if}
 		{/if}
@@ -162,7 +246,15 @@
 	.designations {
 		display: flex;
 	}
-	.ancillary {
+	.selections {
 		display: flex;
+		flex-direction: column;
+		justify-content: flex-start;
+		align-content: flex-start;
+		align-items: flex-start;
+	}
+	.selection {
+		display: flex;
+		flex-direction: row;
 	}
 </style>

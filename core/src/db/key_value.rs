@@ -16,22 +16,40 @@ impl KeyValuePair {
     pub fn set(
         conn: &mut PgConnection,
         key: &str,
-        value: Option<String>,
+        new_value: Option<String>,
+        allow_overwrite: bool,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        match value {
-            Some(value) => match diesel::insert_into(key_val_store::table)
-                .values(KeyValuePair {
-                    key: key.to_string(),
-                    value: value.clone(),
-                })
-                .execute(conn)
-            {
-                Ok(_) => Ok(()),
-                Err(e) => Err(Box::new(e)),
-            },
-            None => match KeyValuePair::delete(conn, key) {
-                Ok(_) => Ok(()),
-                Err(e) => Err(Box::new(e)),
+        match new_value {
+            Some(new_value) => {
+                let insert_operation =
+                    diesel::insert_into(key_val_store::table).values(KeyValuePair {
+                        key: key.to_string(),
+                        value: new_value.clone(),
+                    });
+
+                let result = match allow_overwrite {
+                    true => insert_operation
+                        .on_conflict(key_val_store::key)
+                        .do_update()
+                        .set(key_val_store::value.eq(new_value))
+                        .execute(conn),
+                    false => insert_operation.execute(conn),
+                };
+
+                match result {
+                    Ok(_) => Ok(()),
+                    Err(e) => Err(Box::new(e)),
+                }
+            }
+            None => match allow_overwrite {
+                true => match KeyValuePair::delete(conn, key) {
+                    Ok(_) => Ok(()),
+                    Err(e) => Err(Box::new(e)),
+                },
+                false => Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "Deletion requested without write access.",
+                ))),
             },
         }
     }
@@ -72,12 +90,25 @@ mod tests {
 
         let test_none_key = "test_none";
 
-        KeyValuePair::set(conn, test_none_key, None).expect("Should be able to set.");
+        KeyValuePair::set(conn, &skvp.key, None, true).expect("Should be able to set.");
+        assert!(None == KeyValuePair::get(conn, test_none_key));
+        KeyValuePair::set(conn, test_none_key, None, true).expect("Should be able to set.");
         assert!(None == KeyValuePair::get(conn, test_none_key));
 
-        KeyValuePair::set(conn, &skvp.key, Some(skvp.value.to_string()))
+        KeyValuePair::set(conn, &skvp.key, Some(skvp.value.to_string()), false)
             .expect("Should be able to set.");
         assert!(Some(skvp.value) == KeyValuePair::get(conn, &skvp.key));
-        KeyValuePair::set(conn, &skvp.key, None).expect("Should be able to set.");
+
+        let should_fail =
+            KeyValuePair::set(conn, &skvp.key, Some("Shouldn't work!".to_string()), false);
+        assert!(should_fail.is_err());
+
+        let should_fail = KeyValuePair::set(conn, &skvp.key, None, false);
+        assert!(should_fail.is_err());
+
+        KeyValuePair::set(conn, &skvp.key, Some("Should work!".to_string()), true)
+            .expect("Should be able to set.");
+
+        KeyValuePair::set(conn, &skvp.key, None, true).expect("Should be able to set.");
     }
 }

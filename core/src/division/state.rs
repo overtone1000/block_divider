@@ -59,56 +59,53 @@ impl BlockDivisionState {
         retval
     }
 
-    pub fn set_selections(
-        &mut self,
-        id: String,
+    pub fn set_selections_for_current_round(
         conn: &mut PgConnection,
+        state_id: String,
         participant_index: ParticipantIndex,
         selections: Vec<Option<Selection>>,
-        round: usize,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let pick_count = self
-            .basis
-            .get_participant_definitions()
-            .get(participant_index)
-            .expect("Participant should exist.")
-            .get_round_picks_allowed()
-            .get(round)
-            .expect("Round should exist.");
+        match PersistentDivision::get_from_id(conn, &state_id) {
+            Some(pd) => {
+                let mut state = pd.get_state();
 
-        match self.current_open_round {
-            Some(current_open_round) => {
-                if selections.len() != (*pick_count as usize) {
-                    Err(Box::new(std::io::Error::new(
-                        std::io::ErrorKind::InvalidInput,
-                        format!(
-                            "Incorrect number of picks for {}. Ignoring selection input.",
-                            participant_index
-                        ),
-                    )))
-                } else if round != current_open_round {
-                    Err(Box::new(std::io::Error::new(
-                        std::io::ErrorKind::InvalidInput,
-                        format!(
-                            "Incorrect round {}. Open round is {}. Ignoring selection input.",
-                            round, current_open_round
-                        ),
-                    )))
-                } else {
-                    self.selections.set(round, participant_index, selections);
-                    self.determine_designations_from_current_selections();
-                    match self.save_state(id, conn) {
-                        Ok(_) => Ok(()),
-                        Err(_) => Err(Box::new(std::io::Error::new(
-                            std::io::ErrorKind::InvalidInput,
-                            format!("Couldn't save state."),
-                        ))),
+                match state.current_open_round {
+                    Some(current_open_round) => {
+                        let pick_count = state
+                            .basis
+                            .get_participant_definitions()
+                            .get(participant_index)
+                            .expect("Participant should exist.")
+                            .get_round_picks_allowed()
+                            .get(current_open_round)
+                            .expect("Round should exist.");
+
+                        if selections.len() != (*pick_count as usize) {
+                            Err(Box::new(std::io::Error::new(
+                                std::io::ErrorKind::InvalidInput,
+                                format!(
+                                    "Incorrect number of picks for {}. Ignoring selection input.",
+                                    participant_index
+                                ),
+                            )))
+                        } else {
+                            state
+                                .selections
+                                .set(current_open_round, participant_index, selections);
+                            state.determine_designations_from_current_selections();
+
+                            state.save_state(state_id, conn)
+                        }
                     }
+                    None => Err(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        format!("Selections are closed."),
+                    ))),
                 }
             }
             None => Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                format!("Selections are closed."),
+                std::io::ErrorKind::NotFound,
+                format!("No state with id {}", state_id),
             ))),
         }
     }
@@ -327,33 +324,42 @@ impl BlockDivisionState {
     }
 
     pub fn set_open_round(
-        &mut self,
-        id: String,
-        round_index: Option<usize>,
         conn: &mut PgConnection,
+        state_id: String,
+        round_index: Option<usize>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        match round_index {
-            Some(round_index) => {
-                let mut contains_key = false;
-                for key in 0..self.basis.get_selection_rounds().len() {
-                    if key == round_index {
-                        self.current_open_round = Some(round_index);
-                        contains_key = true;
-                        break;
-                    }
-                }
-                if !contains_key {
-                    return Err(Box::new(std::io::Error::new(
-                        std::io::ErrorKind::InvalidInput,
-                        format!("Invalid round index {}.", round_index),
-                    )));
-                }
-            }
-            None => {}
-        };
+        match PersistentDivision::get_from_id(conn, &state_id) {
+            Some(pd) => {
+                let mut state = pd.get_state();
 
-        self.current_open_round = round_index;
-        self.save_state(id, conn)
+                match round_index {
+                    Some(round_index) => {
+                        let mut contains_key = false;
+                        for key in 0..state.basis.get_selection_rounds().len() {
+                            if key == round_index {
+                                state.current_open_round = Some(round_index);
+                                contains_key = true;
+                                break;
+                            }
+                        }
+                        if !contains_key {
+                            return Err(Box::new(std::io::Error::new(
+                                std::io::ErrorKind::InvalidInput,
+                                format!("Invalid round index {}.", round_index),
+                            )));
+                        }
+                    }
+                    None => {}
+                };
+
+                state.current_open_round = round_index;
+                state.save_state(state_id, conn)
+            }
+            None => Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("No state with id {}", state_id),
+            ))),
+        }
     }
 }
 
@@ -483,13 +489,12 @@ mod tests {
         let id1 = "Test Block Division 3";
         match PersistentDivision::delete_division(&mut conn, id1.to_string()) {
             Ok(_) => {}
-            Err(e) => {
+            Err(_) => {
                 eprintln!("Couldn't delete pre-existing pd, but this may not be an error.");
             }
         }
-        let pd = PersistentDivision::new(&mut conn, id1.to_string(), &basis) //create to test overwriting
-            .expect("Should work.");
-        let mut bds = pd.get_state();
+
+        PersistentDivision::new(&mut conn, id1.to_string(), &basis).expect("Should work."); //Test overwriting
 
         let participant_index = PARTICIPANT_A.0;
 
@@ -502,33 +507,36 @@ mod tests {
         let mut ancillaries_a: BTreeSet<AncillaryIndex> = BTreeSet::new();
         ancillaries_a.insert(BLACK_BUTTE.0);
 
-        for n in 0..PICKS_PER_ROUND {
+        for _n in 0..PICKS_PER_ROUND {
             selections_a.push(Some(Selection {
                 bucket_index: current_bucket_index,
                 ancillaries: ancillaries_a.clone(),
             }));
         }
 
-        bds.set_open_round(pd.get_id(), Some(current_round_index), &mut conn)
+        BlockDivisionState::set_open_round(&mut conn, id1.to_string(), Some(current_round_index))
             .expect("Couldn't set open round.");
 
-        bds.set_selections(
-            pd.get_id(),
+        BlockDivisionState::set_selections_for_current_round(
             &mut conn,
+            id1.to_string(),
             participant_index,
             selections_a,
-            current_round_index,
         )
         .expect("Should be able to input selection.");
-        bds.determine_designations_from_current_selections();
 
-        /*
+        let bds = PersistentDivision::get_from_id(&mut conn, id1)
+            .expect("Should exist.")
+            .get_state();
+        assert!(current_round_index == bds.current_open_round.expect("Should not be none."));
+
+        //bds.determine_designations_from_current_selections(); //This is called internally by the set_selections_for_current_fround function.
+
         println!("----------------------");
         println!("Block Division State Serialization:");
         bds.pretty_print();
         println!("----------------------");
         println!("");
-        */
 
         let pertinent_designations = &bds
             .bucket_states

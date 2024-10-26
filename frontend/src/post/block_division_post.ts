@@ -4,10 +4,12 @@ import type { GetUserView } from "./posts/get_user_view";
 import type { NewBasis } from "./posts/new_basis";
 import type { SendStartEmail } from "./posts/send_start_email";
 import type { SetState } from "./posts/set_state";
+import type { SubmitSelections } from "./posts/submit_selections";
 import type { BlockDivisionState, BlockDivisionStateList } from "./results/block_division_state";
 
 export type BlockDivisionPost =
     { GetUserView: GetUserView } |
+    { SubmitSelections: SubmitSelections } |
     { GetStates: GetStates } |
     { SetState: SetState } |
     { NewBasis: NewBasis } |

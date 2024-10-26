@@ -1,7 +1,7 @@
 use hyper_util::client::legacy::connect::Connect;
 use serde::Serialize;
-use std::{borrow::BorrowMut, future::Future, pin::Pin, sync::Arc};
-use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use std::{borrow::BorrowMut, collections::BTreeMap, future::Future, num::IntErrorKind, pin::Pin, sync::Arc};
+use tokio::sync::{mpsc::{self, UnboundedReceiver, UnboundedSender}};
 
 use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection},
@@ -23,7 +23,7 @@ use hyper_services::{
 };
 
 use crate::{
-    db::{division::PersistentDivision, key_value::KeyValuePair}, division::bucket, server::{requests::{block_division_user_view::UserView, BlockDivisionPost}, responses::SingleBlockDivisionState}
+    db::{division::PersistentDivision, key_value::KeyValuePair}, division::{bucket, state::BlockDivisionState}, server::{requests::{block_division_user_view::UserView, BlockDivisionPost}, responses::SingleBlockDivisionState}
 };
 
 use super::responses::BlockDivisionServerResponse;
@@ -31,6 +31,7 @@ use super::responses::BlockDivisionServerResponse;
 #[derive(Clone)]
 pub struct PostHandler {
     database_transaction_handler: Pool<ConnectionManager<PgConnection>>,
+    block_division_write_mutices: Arc<std::sync::Mutex<BTreeMap<String,Arc<std::sync::Mutex<()>>>>>
 }
 
 const BLOCK_DIVISION: &str = "/block_division_post";
@@ -64,8 +65,29 @@ impl PostHandler {
     pub fn new(database_transaction_handler: Pool<ConnectionManager<PgConnection>>) -> PostHandler {
         PostHandler {
             database_transaction_handler: database_transaction_handler,
+            block_division_write_mutices: Arc::new(std::sync::Mutex::new(BTreeMap::new())),
         }
     }
+
+    fn get_block_division_lock(&self,id:&str)->Result<Arc<std::sync::Mutex<()>>,Box<dyn std::error::Error>>
+    {
+        match self.block_division_write_mutices.lock()
+        {
+            Ok(mut outer_mutex) => {
+                match outer_mutex.entry(id.to_string())
+                {
+                    std::collections::btree_map::Entry::Vacant(vacant_entry) => {
+                        Ok(vacant_entry.insert(Arc::new(std::sync::Mutex::new(()))).clone())
+                    },
+                    std::collections::btree_map::Entry::Occupied(occupied_entry) => {
+                        Ok(occupied_entry.get().clone())
+                    },
+                }
+            },
+            Err(_) => return Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other,"Couldn't get outer mutex."))),
+        }
+    }
+    
 
     fn get_conn(
         &self,
@@ -137,44 +159,7 @@ impl PostHandler {
                         match UserView::get(&mut conn, get_user_view_request.get_hash()) {
                             Ok(user_view) => {
                                 println!("Got request for {:?}", user_view);
-                                match PersistentDivision::get_state_from_id(
-                                    &mut conn,
-                                    user_view.get_state_id(),
-                                ) {
-                                    Ok(state) => match state {
-                                        Some(mut state)=>{
-                                            //Censor the final state
-                                            let start = match state.current_open_round
-                                            {
-                                                Some(start)=>{
-                                                    start+1
-                                                },
-                                                None=>{
-                                                    0
-                                                }
-                                            };
-                                            let fin =state.basis.get_selection_rounds().len();
-                                            println!("Censoring rounds {} - {}",start,fin-1);
-                                            for bucket_state in &mut state.bucket_states
-                                            {
-                                                for round in start..fin
-                                                {
-                                                    bucket_state.get_state_mut(&round).ranks=None;
-                                                }
-                                            }
-
-                                            get_response(Some(SingleBlockDivisionState
-                                                {
-                                                    user_id:user_view.get_user_id(),
-                                                    state_id:user_view.get_state_id().to_string(),
-                                                    state:state
-                                                }))
-                                        },None=>{
-                                            generic_json_error("No such state")
-                                        }
-                                    },
-                                    Err(e) => generic_json_error_from_debug(e),
-                                }
+                                get_user_view(&mut conn,&user_view)
                             }
                             Err(e) => generic_json_error_from_debug(e),
                         }
@@ -255,6 +240,28 @@ impl PostHandler {
                             Err(e) => generic_json_error_from_debug(e),
                         }
                     }
+                    BlockDivisionPost::SubmitSelections(submit_selections) => {
+                        match self.get_block_division_lock(&submit_selections.state_id)
+                        {
+                            Ok(lock) => {
+                                match lock.lock(){
+                                    Ok(_)=>{
+                                        match BlockDivisionState::set_selections_for_current_round(&mut conn, 
+                                            submit_selections.state_id.to_string(),  
+                                            submit_selections.user_id, 
+                                            submit_selections.selections){
+                                                Ok(_) => {
+                                                    get_user_view(&mut conn,&UserView::create(submit_selections.user_id as i32,submit_selections.state_id))
+                                                },
+                                                Err(e) => generic_json_error_from_debug(e),
+                                            }
+                                    }
+                                    Err(_) => generic_json_error("Couldn't lock block id."),
+                                }
+                            },
+                            Err(e) => generic_json_error_from_debug(e),
+                        }
+                    },
                 },
                 Err(err) => generic_json_error_from_debug(err),
             }
@@ -282,5 +289,51 @@ where
             serde_json::to_string(&result).expect("Couldn't serialize result"),
         )),
         None => generic_json_error("No such state."),
+    }
+}
+
+fn get_user_view(conn:&mut PgConnection,user_view:&UserView)->Response<
+http_body_util::combinators::BoxBody<
+    hyper::body::Bytes,
+    Box<dyn std::error::Error + Send + Sync>,
+>,
+>{
+    match PersistentDivision::get_state_from_id(
+        conn,
+        user_view.get_state_id(),
+    ) {
+        Ok(state) => match state {
+            Some(mut state)=>{
+                //Censor the final state
+                let start = match state.current_open_round
+                {
+                    Some(start)=>{
+                        start+1
+                    },
+                    None=>{
+                        0
+                    }
+                };
+                let fin =state.basis.get_selection_rounds().len();
+                println!("Censoring rounds {} - {}",start,fin-1);
+                for bucket_state in &mut state.bucket_states
+                {
+                    for round in start..fin
+                    {
+                        bucket_state.get_state_mut(&round).ranks=None;
+                    }
+                }
+
+                get_response(Some(SingleBlockDivisionState
+                    {
+                        user_id:user_view.get_user_id(),
+                        state_id:user_view.get_state_id().to_string(),
+                        state:state
+                    }))
+            },None=>{
+                generic_json_error("No such state")
+            }
+        },
+        Err(e) => generic_json_error_from_debug(e),
     }
 }
