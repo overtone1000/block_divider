@@ -61,7 +61,7 @@ mod tests {
 
     #[test]
     fn test_insert_and_delete() {
-        dotenvy::dotenv().expect("Couldn't load environment variables.");
+        dotenvy::dotenv().expect("Couldn't load environment variables for testing.");
         let conn = &mut establish_connection();
 
         let test_user = User::new_user(

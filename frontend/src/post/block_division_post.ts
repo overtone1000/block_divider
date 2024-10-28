@@ -25,7 +25,8 @@ export type BlockDivisionPostResult =
     boolean;
 
 export let block_division_post = (post: BlockDivisionPost, callback: (result: BlockDivisionPostResult) => void) => {
-    fetch("http://localhost:8181/block_division_post", {
+    //fetch("http://localhost:8181/block_division_post", {
+    fetch(import.meta.env.VITE_POST_ROOT + "block_division_post", {
         method: "POST",
         body: JSON.stringify(post)
     }).then((result) => {

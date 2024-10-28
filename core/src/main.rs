@@ -2,8 +2,12 @@ use std::error::Error;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    println!("Loading environment variables.");
-    dotenvy::dotenv()?;
+    println!("Checking for local environment variables.");
+
+    let _ = dotenvy::dotenv().is_err_and(|_| {
+        println!("No env file found.");
+        true
+    });
 
     println!("Starting Block Divider");
     let server_handle = tokio::spawn(block_divider::tokio_serve());

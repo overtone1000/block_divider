@@ -50,8 +50,8 @@ impl StatefulHandler for PostHandler {
                 Self::handle_post(&mut self, request).await
             }
             (Method::GET, path) => {
-                println!("File request: {}", path);
-                send_file(path.to_string()).await
+                let root = std::env::var("FILE_ROOT").expect("FILE_ROOT must be set");
+                send_file(&root, path).await
             }
             _ => {
                 eprintln!("Not found.");
@@ -99,7 +99,10 @@ impl PostHandler {
     }
 
     async fn handle_post(&mut self, request: Request<Incoming>) -> HandlerResult {
-        let as_string = get_request_body_as_string(request).await?;
+
+        let (parts, body) = request.into_parts();
+
+        let as_string = get_request_body_as_string(body).await?;
 
         println!("Handling request {}", &as_string);
 
@@ -198,23 +201,43 @@ impl PostHandler {
         
                                                                         let hash =
                                                                             send_start_email.get_hash();
+                                                                        
+                                                                        match &parts.headers.get(hyper::header::ORIGIN)//hyper::header::REFERER
+                                                                        {
+                                                                            Some(host)=>
+                                                                            {
+                                                                                match  host.to_str()
+                                                                                {
+                                                                                    Ok(url)=>{
+                                                                                        let body = email_body(url,&hash);
         
-                                                                        let body = format!("Enter your selections at http://localhost:5173?hash={}",hash);
-        
-                                                                        match mail::send_mail(
-                                                                            &mail_service,
-                                                                            user.get_email(),
-                                                                            subject,
-                                                                            body,
-                                                                        ){
-                                                                            Ok(r)=>{
-                                                                                if r.is_positive() {
-                                                                                    get_response(Some(true))
-                                                                                }else {
-                                                                                    generic_json_error(&format!("Couldn't send e-mail to {}, error: {}",user.get_email(),r.code()))
+                                                                                        match mail::send_mail(
+                                                                                            &mail_service,
+                                                                                            user.get_email(),
+                                                                                            subject,
+                                                                                            body,
+                                                                                        ){
+                                                                                            Ok(r)=>{
+                                                                                                if r.is_positive() {
+                                                                                                    get_response(Some(true))
+                                                                                                }else {
+                                                                                                    generic_json_error(&format!("Couldn't send e-mail to {}, error: {}",user.get_email(),r.code()))
+                                                                                                }
+                                                                                                },Err(e)=>{generic_json_error_from_debug(e)}
+                                                                                        }
+                                                                                    }
+                                                                                    Err(e)=>generic_json_error_from_debug(e)
                                                                                 }
-                                                                                },Err(e)=>{generic_json_error_from_debug(e)}
+                                                                                
+                                                                            }
+                                                                            None=>
+                                                                            {
+                                                                                generic_json_error(&format!(
+                                                                                    "Request contained no host"
+                                                                                ))
+                                                                            }
                                                                         }
+                                                                        
                                                                     },
                                                                     Err(e)=>generic_json_error_from_debug(e)
                                                                 }
@@ -271,6 +294,21 @@ impl PostHandler {
         println!("Returning {:?}", response);
         return Ok(response);
     }
+}
+
+fn email_body(url:&str, hash:&str)->String
+{
+    format!(
+        "
+        <!DOCTYPE html>
+        <html>
+        <body>
+        <a href=\"{}?hash={}\">Click here</a> to enter your selections.
+        </body>
+        </html>
+        ",
+        url,
+        hash)
 }
 
 fn get_response<T>(

@@ -434,7 +434,7 @@ mod tests {
 
     #[test]
     fn block_division_cache_and_serialization_testing() {
-        dotenvy::dotenv().expect("Couldn't load environment variables.");
+        dotenvy::dotenv().expect("Couldn't load environment variables for testing.");
         let mut conn = establish_connection();
         let basis = create_basis();
 
@@ -482,7 +482,7 @@ mod tests {
 
     #[test]
     fn selection_and_calculation() {
-        dotenvy::dotenv().expect("Couldn't load environment variables.");
+        dotenvy::dotenv().expect("Couldn't load environment variables for testing.");
         let mut conn = establish_connection();
         let basis = create_basis();
 

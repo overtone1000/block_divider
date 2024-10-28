@@ -20,7 +20,7 @@ mod tests {
 
     #[test]
     fn test_db_connection() {
-        dotenvy::dotenv().expect("Couldn't load environment variables.");
+        dotenvy::dotenv().expect("Couldn't load environment variables for testing.");
         establish_connection();
     }
 }

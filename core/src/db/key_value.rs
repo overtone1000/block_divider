@@ -24,20 +24,45 @@ impl KeyValuePair {
                 let insert_operation =
                     diesel::insert_into(key_val_store::table).values(KeyValuePair {
                         key: key.to_string(),
-                        value: new_value.clone(),
+                        value: new_value.to_string(),
                     });
 
                 let result = match allow_overwrite {
                     true => insert_operation
                         .on_conflict(key_val_store::key)
                         .do_update()
-                        .set(key_val_store::value.eq(new_value))
+                        .set(key_val_store::value.eq(new_value.to_string()))
                         .execute(conn),
-                    false => insert_operation.execute(conn),
+                    false => insert_operation
+                        .on_conflict(key_val_store::key)
+                        .do_nothing()
+                        .execute(conn),
                 };
 
                 match result {
-                    Ok(_) => Ok(()),
+                    Ok(n) => match n {
+                        1 => Ok(()),
+                        0 => match KeyValuePair::get(conn,key) {
+                            Some(current_value) => 
+                            match current_value==new_value
+                            {
+                                true=>{
+                                    println!("Key value pair already exists, but current value matches new value.");
+                                    Ok(())},
+                                false=>{Err(Box::new(std::io::Error::new(
+                                    std::io::ErrorKind::InvalidData,
+                                    format!("Key value pair already exists. Current value: {}, New value: {}",current_value,new_value),
+                                )))}},
+                            None => Err(Box::new(std::io::Error::new(
+                                std::io::ErrorKind::InvalidData,
+                                "Couldn't set or get key value pair.",
+                            ))),
+                        },
+                        _ => Err(Box::new(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "Should never be more than one.",
+                        ))),
+                    },
                     Err(e) => Err(Box::new(e)),
                 }
             }
@@ -80,7 +105,7 @@ mod tests {
 
     #[test]
     fn test_insert_and_delete() {
-        dotenvy::dotenv().expect("Couldn't load environment variables.");
+        dotenvy::dotenv().expect("Couldn't load environment variables for testing.");
         let conn = &mut establish_connection();
 
         let skvp = KeyValuePair {
