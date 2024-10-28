@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM docker.io/rust:alpine
 
 # Context of build must be root of this repository, not the directory containing this Dockerfile. See build.sh for hints.
 COPY ./core/target/release/block_divider /bin/block_divider/block_divider

@@ -4,10 +4,10 @@ services:
     restart: always
     networks:
       - internal_net
-    #ports:
-      #- "80:80"
-      #- "443:443"
-    image: overtone1000/nginx_certbot:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    image: docker.io/overtone1000/nginx_certbot:alpine
     volumes:
       - nginx:/etc/nginx/sites-available/ #certbot will make changes that need to persist
       - static_content:/var/www/html/ #allow static content to persist
@@ -49,7 +49,7 @@ services:
 
   postgres:
     restart: always
-    image: postgres:12
+    image: docker.io/postgres:12
     networks:
       - internal_net
     volumes:

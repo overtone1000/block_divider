@@ -6,10 +6,14 @@
     ufw allow 22/tcp && \
     ufw allow 80/tcp && \
     ufw allow 443/tcp && \
+    ufw allow 2377/tcp && \
+    ufw allow 7946/tcp && \
+    ufw allow 7946/udp && \
+    ufw allow 4789/udp && \
     ufw reload && \
     ufw enable
     ```
-3. Install `podman` on VPS and on development workstation
+3. Install `podman` and `podman-compose` on VPS and on development workstation
 4. Build core (see `.vscode/tasks.json`)
 5. Build frontend (see `.vscode/tasks.json`)
 6. Build the dockerfile at `deploy/prod/docker/Dockerfile`
