@@ -19,11 +19,14 @@ IMAGE_NAME=block_divider
 
 FULL_PREFACE=$REGISTRY/$UNAME/$IMAGE_NAME
 
-docker build -t $FULL_PREFACE:"$TAG" -t $FULL_PREFACE:prod -f ./docker/Dockerfile ../../src/backend/
-#docker login -u "$UNAME" $REGISTRY #Can't do this noninteractively. Just log in before deploy.
-docker push $UNAME/$IMAGE_NAME:"$TAG"
-docker push $UNAME/$IMAGE_NAME:prod
+echo Building
+podman build -t $FULL_PREFACE:"$TAG" -t $FULL_PREFACE:prod -f ./docker/Dockerfile ../.. #Repository root
 
+echo Pushing image to repository
+podman push $UNAME/$IMAGE_NAME:"$TAG"
+podman push $UNAME/$IMAGE_NAME:prod
+
+echo Committing git
 # Git tag
 if [ -n "$(git status --porcelain)" ]; then
     git commit -a --signoff -m "Version $TAG"
