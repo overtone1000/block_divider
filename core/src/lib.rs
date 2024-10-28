@@ -36,6 +36,7 @@ pub async fn tokio_serve<'a>() -> Result<(), Box<dyn std::error::Error + Send + 
         .build(cm)
         .expect("Could not build connection pool");
 
+    println!("Running pending database migrations");
     match db_handler.get() {
         Ok(mut conn) => match conn.run_pending_migrations(MIGRATIONS) {
             Ok(_) => (),
