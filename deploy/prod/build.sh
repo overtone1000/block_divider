@@ -2,6 +2,8 @@
 
 set -e
 
+export CONTAINER_HOST="unix:///run/podman/podman.sock"
+
 TAG=$1
 
 if [ "$#" -ne 1 ]; then
@@ -20,11 +22,11 @@ IMAGE_NAME=block_divider
 FULL_PREFACE=$REGISTRY/$UNAME/$IMAGE_NAME
 
 echo Building
-podman build -t $FULL_PREFACE:"$TAG" -t $FULL_PREFACE:prod -f ./docker/Dockerfile ../.. #Repository root
+sudo podman build -t $FULL_PREFACE:"$TAG" -t $FULL_PREFACE:prod -f ./docker/Dockerfile ../.. #Repository root
 
 echo Pushing image to repository
-podman push $UNAME/$IMAGE_NAME:"$TAG"
-podman push $UNAME/$IMAGE_NAME:prod
+sudo podman push $UNAME/$IMAGE_NAME:"$TAG"
+sudo podman push $UNAME/$IMAGE_NAME:prod
 
 echo Committing git
 # Git tag
