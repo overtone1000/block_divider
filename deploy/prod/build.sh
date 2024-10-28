@@ -33,7 +33,7 @@ if [ -n "$(git status --porcelain)" ]; then
     git tag -af v"$TAG" -m "Version $TAG"
 
     CURRENT_BRANCH=$(git branch --show-current)
-    git checkout prod
+    git checkout main
     git merge "$CURRENT_BRANCH"
     git push -f origin v"$TAG"
     git checkout "$CURRENT_BRANCH"
