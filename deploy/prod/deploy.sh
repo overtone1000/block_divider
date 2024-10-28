@@ -2,6 +2,6 @@
 
 set -e
 
-source .env
+source ./.env
 
 podman compose -f ./docker/stack.yml up --detach
