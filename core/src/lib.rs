@@ -5,6 +5,7 @@ use diesel::{
     r2d2::{ConnectionManager, Pool},
     PgConnection,
 };
+use diesel_migrations::MigrationHarness;
 use hyper_services::{
     service::{stateful_service::StatefulService, stateless_service::StatelessService},
     spawn_server,
@@ -20,6 +21,9 @@ pub mod server;
 
 const PORT: u16 = 8181;
 
+pub const MIGRATIONS: diesel_migrations::EmbeddedMigrations =
+    diesel_migrations::embed_migrations!("./migrations");
+
 pub async fn tokio_serve<'a>() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("Starting database transaction handler");
     //let mut db_handler: AsyncDatabaseTransactionHandler<DatabaseTransaction, PgConnection> =
@@ -31,6 +35,19 @@ pub async fn tokio_serve<'a>() -> Result<(), Box<dyn std::error::Error + Send + 
         .test_on_check_out(true)
         .build(cm)
         .expect("Could not build connection pool");
+
+    match db_handler.get() {
+        Ok(mut conn) => match conn.run_pending_migrations(MIGRATIONS) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Couldn't run migrations. {:?}", e),
+                )));
+            }
+        },
+        Err(e) => return Err(Box::new(e)),
+    };
 
     println!("Building server");
     let service = PostHandler::new(db_handler);
