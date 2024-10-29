@@ -4,6 +4,7 @@
     ```
     ufw reset && \
     ufw allow 22/tcp && \
+    ufw allow 53/udp && \
     ufw allow 80/tcp && \
     ufw allow 443/tcp && \
     ufw allow 2377/tcp && \
@@ -13,8 +14,12 @@
     ufw reload && \
     ufw enable
     ```
-3. Install `podman` and `podman-compose` on VPS and on development workstation
+    22 is for ssh
+    53 is for podman
+    
+3. Install `podman`, `podman-compose`, and `aardvark-dns` on VPS and on development workstation
 4. Build core (see `.vscode/tasks.json`)
+    - This assumes the build is happening on a workstation running 64-bit Ubuntu, which is the container architexture. If not, set the build to target the correct architecture.
 5. Build frontend (see `.vscode/tasks.json`)
 6. Build the dockerfile at `deploy/prod/docker/Dockerfile`
     - See the convenience build script at `deploy/prod/build.sh` for tips for how to do this using a docker registry
