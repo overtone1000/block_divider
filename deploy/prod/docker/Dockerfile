@@ -4,4 +4,4 @@ FROM docker.io/rust:alpine
 COPY ./core/target/release/block_divider .app/block_divider
 COPY ./frontend/build /var/www/block_divider
 
-ENTRYPOINT ["/bin/sh"]
+CMD [".app/block_divider"]
