@@ -57,7 +57,7 @@ pub async fn tokio_serve<'a>() -> Result<(), Box<dyn std::error::Error + Send + 
         println!("Starting server.");
 
         let server = spawn_server(
-            IpAddr::V4(Ipv4Addr::LOCALHOST),
+            IpAddr::V4(Ipv4Addr::UNSPECIFIED),
             PORT,
             StatefulService::<PostHandler>::create(service.clone()),
         );
