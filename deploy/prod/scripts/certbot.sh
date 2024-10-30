@@ -30,7 +30,7 @@ podman exec "$CONTAINER_ID" certbot \
     -d "schedule.autoscheda.com" \
     -d "pa-schedule.autoscheda.com" \
     -d "test.autoscheda.com" \
-    #-d "block-division.autoscheda.com"
+    -d "block-division.autoscheda.com"
     #-d "logs.autoscheda.com" \
     #-d "loki.autoscheda.com" \
 
