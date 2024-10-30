@@ -20,7 +20,7 @@ IMAGE_NAME=block_divider
 FULL_PREFACE=$REGISTRY/$UNAME/$IMAGE_NAME
 
 echo Building
-sudo podman build -t $FULL_PREFACE:"$TAG" -t $FULL_PREFACE:prod -f ./docker/Dockerfile ../.. #Repository root
+sudo podman build -t $FULL_PREFACE:"$TAG" -t $FULL_PREFACE:prod -f ../docker/Dockerfile ../../.. #Repository root
 
 echo Pushing image to repository
 sudo podman push $UNAME/$IMAGE_NAME:"$TAG"

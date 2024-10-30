@@ -2,11 +2,10 @@
 
 set -e
 
-REMOTE_IP="137.184.81.246"
-REMOTE_USER="root"
+source ./server.sh
 
-STACK="./docker/stack.yml"
-ENV_F="./.env"
+STACK="../docker/stack.yml"
+ENV_F="../.env"
 
 TMP_FOLDER=/tmp/stack
 
