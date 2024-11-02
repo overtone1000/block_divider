@@ -15,6 +15,7 @@
 	import ModifiableBucketList from "../modifiable_lists/modifiable_bucket_list.svelte";
 	import { DisplayMode, handle_error } from "../../commons/commons";
 	import type { Basis } from "../../post/results/state_components/basis";
+	import ModifiableStringList from "../modifiable_lists/commons/modifiable_string_list.svelte";
 
 	export let selected_division: [string, BlockDivisionState] | undefined = undefined;
 	export let set_display_mode: (mode: DisplayMode) => void;
@@ -112,13 +113,7 @@
 
 		<div class="area">
 			Selection Rounds
-			<div class="list">
-				{#each basis.selection_round_names as selection_round_name}
-					<div class="area">
-						<Textfield label="Round Name" bind:value={selection_round_name} />
-					</div>
-				{/each}
-			</div>
+			<ModifiableStringList label="Selection Round Name" bind:list={basis.selection_round_names} />
 		</div>
 	</div>
 	<SaveDiscard {save_func} {discard_func} />

@@ -2,40 +2,38 @@
 	import Textfield from "@smui/textfield";
 	import ModifiableStringList from "./commons/modifiable_string_list.svelte";
 	import ModifiableListDeleteButton from "./commons/modifiable_list_delete_button.svelte";
-	import type { BucketDefinition } from "../../post/results/state_components/basis";
+	import type {
+		BucketDefinition,
+		ParticipantDefinition
+	} from "../../post/results/state_components/basis";
 	import ModifiableListContainer from "./commons/modifiable_list_container.svelte";
-	export let bucket_definitions: BucketDefinition[];
-
-	console.debug(bucket_definitions);
+	import ModifiableNumberList from "./commons/modifiable_number_list.svelte";
+	export let participants: ParticipantDefinition[];
 </script>
 
 <div class="area">
 	<ModifiableListContainer
 		add={() => {
-			bucket_definitions.push({
-				name: "New Bucket",
-				available_slots: 0,
-				available_ancillaries: []
+			participants.push({
+				name: "New Participant",
+				email: "",
+				round_picks_allowed: []
 			});
-			bucket_definitions = bucket_definitions;
+			participants = participants;
 		}}
 	>
-		{#each bucket_definitions as bucket_definition, index}
+		{#each participants as participant, index}
 			<div class="area">
 				<div class="row">
-					<Textfield label="Bucket Name" bind:value={bucket_definition.name} />
-					<Textfield
-						label="Available Slots"
-						type="number"
-						bind:value={bucket_definition.available_slots}
-					/>
+					<Textfield label="Participant name" bind:value={participant.name} />
+					<Textfield label="Email" type="email" bind:value={participant.email} />
 					<div class="spacer" />
-					<ModifiableListDeleteButton bind:list={bucket_definitions} {index} />
+					<ModifiableListDeleteButton bind:list={participants} {index} />
 				</div>
 				<div class="area">
-					Ancillaries
-					<ModifiableStringList
-						bind:list={bucket_definition.available_ancillaries}
+					Selections Allowed
+					<ModifiableNumberList
+						bind:list={participant.round_picks_allowed}
 						label="Ancillary Name"
 					/>
 				</div>

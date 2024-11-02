@@ -43,7 +43,7 @@ impl StatefulHandler for PostHandler {
     async fn handle_request(mut self: Self, request: Request<Incoming>) -> HandlerResult {
         let (parts, body) = request.into_parts();
         let method = &parts.method;
-        let (path,query)=match parts.uri.path_and_query()
+        let (path,_query)=match parts.uri.path_and_query()
         {
             Some(pq)=>{(pq.path(),pq.query())},
             None=>("",None)
