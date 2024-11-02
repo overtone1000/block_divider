@@ -244,7 +244,8 @@ impl PostHandler {
                                                                     {
                                                                         Ok(_)=>{
                                                                             let subject = format!(
-                                                                                "Block Division {} Started",
+                                                                                "{}, block division {} has started",
+                                                                                user.get_name(),
                                                                                 send_start_email.get_state_id()
                                                                             );
             
