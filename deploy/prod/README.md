@@ -20,7 +20,7 @@
     - route allow for eth0 and podman1 may require `ifconfig` to determine the correct networks that need binding, but this is necessary to allow external traffic to get to containers
     - Are the other ports really necessary?
     
-4. Install `podman`, `podman-compose`, and `aardvark-dns` on VPS and on development workstation
+4. Install `podman`, `podman-compose`, `slirp4netns`, and `aardvark-dns` on VPS and on development workstation
 5. Build core (see `.vscode/tasks.json`)
     - This assumes the build is happening on a workstation running 64-bit Ubuntu, which is the container architexture. If not, set the build to target the correct architecture.
 6. Build frontend (see `.vscode/tasks.json`)

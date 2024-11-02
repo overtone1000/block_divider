@@ -24,7 +24,7 @@ services:
       options:
         max-size: 1m
 
-  core:
+  block_divider_core:
     restart: always
     image: docker.io/overtone1000/block_divider:prod
     networks:
