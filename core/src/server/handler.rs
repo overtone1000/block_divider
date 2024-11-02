@@ -14,10 +14,10 @@ use hyper::{
     Method, Request, Response,
 };
 use hyper_services::{
-    commons::{HandlerBody, HandlerError, HandlerFuture, HandlerResponse, HandlerResult},
+    commons::{Handler, HandlerBody, HandlerError, HandlerFuture, HandlerResult},
     cors::permit_all_cors,
     generic_json_error::{generic_json_error, generic_json_error_from_debug},
-    request_processing::get_request_body_as_string,
+    request_processing::{check_basic_authentication, get_request_body_as_string},
     response_building::{full_to_boxed_body, not_found, send_file},
     service::stateful_service::StatefulHandler,
 };
@@ -35,21 +35,43 @@ pub struct PostHandler {
 }
 
 const BLOCK_DIVISION: &str = "/block_division_post";
+const ADMIN: &str = "admin";
 
 impl StatefulHandler for PostHandler {
     async fn handle_request(mut self: Self, request: Request<Incoming>) -> HandlerResult {
-        let method = request.method().clone();
-        let path = request.uri().path();
-        //let headers = request.headers().clone();
+        let (parts, body) = request.into_parts();
+        let method = &parts.method;
+        let path=parts.uri.to_string();
 
         println!("Method: {}, Path: {}", method, path);
 
-        match (method, path) {
-            (Method::POST, BLOCK_DIVISION) => {
-                println!("Block division post.");
-                Self::handle_post(&mut self, request).await
+        let tree:Vec<&str>= path.split_terminator("/").collect();
+        
+        match tree.get(0)
+        {
+            Some(first)=>{
+                match *first
+                {
+                    ADMIN=>{
+                        let validator = |str:&str|{str=="Hahahaha!"};
+                        match check_basic_authentication(&parts, ADMIN, validator).await
+                        {
+                            Handler::Continue=>(),
+                            Handler::ImmediateReturn(response) => return response
+                        };
+                    },
+                    _=>()
+                }
             }
-            (Method::GET, path) => {
+            None=>()
+        }
+                
+        match (method, path.as_str()) {
+            (&Method::POST, BLOCK_DIVISION) => {
+                println!("Block division post.");
+                Self::handle_post(&mut self, parts,body).await
+            }
+            (&Method::GET, path) => {
                 let root = std::env::var("FILE_ROOT").expect("FILE_ROOT must be set");
                 send_file(&root, path).await
             }
@@ -98,9 +120,7 @@ impl PostHandler {
         }
     }
 
-    async fn handle_post(&mut self, request: Request<Incoming>) -> HandlerResult {
-
-        let (parts, body) = request.into_parts();
+    async fn handle_post(&mut self, parts: hyper::http::request::Parts, body:Incoming) -> HandlerResult {
 
         let as_string = get_request_body_as_string(body).await?;
 
@@ -313,12 +333,7 @@ fn email_body(url:&str, hash:&str)->String
 
 fn get_response<T>(
     message: Option<T>,
-) -> Response<
-    http_body_util::combinators::BoxBody<
-        hyper::body::Bytes,
-        Box<dyn std::error::Error + Send + Sync>,
-    >,
->
+) -> Response<HandlerBody>
 where
     T: BlockDivisionServerResponse
 {
@@ -330,12 +345,7 @@ where
     }
 }
 
-fn get_user_view(conn:&mut PgConnection,user_view:&UserView)->Response<
-http_body_util::combinators::BoxBody<
-    hyper::body::Bytes,
-    Box<dyn std::error::Error + Send + Sync>,
->,
->{
+fn get_user_view(conn:&mut PgConnection,user_view:&UserView)->Response<HandlerBody>{
     match PersistentDivision::get_state_from_id(
         conn,
         user_view.get_state_id(),
