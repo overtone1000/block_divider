@@ -2,11 +2,14 @@
 	import Textfield from "@smui/textfield";
 	import ModifiableStringList from "./commons/modifiable_string_list.svelte";
 	import ModifiableListDeleteButton from "./commons/modifiable_list_delete_button.svelte";
-	import type { BucketDefinition } from "../../post/results/state_components/basis";
+	import type { Basis, BucketDefinition } from "../../post/results/state_components/basis";
 	import ModifiableListContainer from "./commons/modifiable_list_container.svelte";
-	export let bucket_definitions: BucketDefinition[];
+	export let basis: Basis;
 
-	console.debug(bucket_definitions);
+	let bucket_definitions: BucketDefinition[];
+	$: {
+		bucket_definitions = basis.bucket_definitions;
+	}
 </script>
 
 <ModifiableListContainer
@@ -16,7 +19,7 @@
 			available_slots: 0,
 			available_ancillaries: []
 		});
-		bucket_definitions = bucket_definitions;
+		basis = basis;
 	}}
 >
 	{#each bucket_definitions as bucket_definition, index}

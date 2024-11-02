@@ -13,10 +13,10 @@
 		BlockDivisionStateList
 	} from "../../post/results/block_division_state";
 	import ModifiableBucketList from "../modifiable_lists/modifiable_bucket_list.svelte";
-	import ModifiableParticipantList from "../modifiable_lists/modifiable_participant_list.svelte";
 	import { DisplayMode, handle_error } from "../../commons/commons";
 	import type { Basis } from "../../post/results/state_components/basis";
 	import ModifiableStringList from "../modifiable_lists/commons/modifiable_string_list.svelte";
+	import ModifiableParticipantList from "../modifiable_lists/modifiable_participant_list.svelte";
 
 	export let selected_division: [string, BlockDivisionState] | undefined = undefined;
 	export let set_display_mode: (mode: DisplayMode) => void;
@@ -80,12 +80,12 @@
 		</div>
 		<div class="area">
 			Buckets
-			<ModifiableBucketList bind:bucket_definitions={basis.bucket_definitions} />
+			<ModifiableBucketList bind:basis />
 		</div>
 
 		<div class="area">
 			Participants
-			<ModifiableParticipantList bind:participants={basis.participant_definitions} />
+			<ModifiableParticipantList bind:basis />
 		</div>
 
 		<div class="area">
