@@ -579,6 +579,7 @@ dependencies = [
 name = "hyper-services"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "futures-util",
  "http-body-util",
  "hyper",

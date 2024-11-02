@@ -17,7 +17,7 @@ use hyper_services::{
     commons::{Handler, HandlerBody, HandlerError, HandlerFuture, HandlerResult},
     cors::permit_all_cors,
     generic_json_error::{generic_json_error, generic_json_error_from_debug},
-    request_processing::{check_basic_authentication, get_request_body_as_string},
+    request_processing::{basic_authentication_decode, check_basic_authentication, get_request_body_as_string},
     response_building::{full_to_boxed_body, not_found, send_file},
     service::stateful_service::StatefulHandler,
 };
@@ -37,36 +37,40 @@ pub struct PostHandler {
 const BLOCK_DIVISION: &str = "/block_division_post";
 const ADMIN: &str = "admin";
 
+fn validator (str:&str)->bool{println!("Received credentials: {}",str);basic_authentication_decode(str)==Some(("tyler".to_string(),"notanotherweakpassword!".to_string()))}
+
 impl StatefulHandler for PostHandler {
     async fn handle_request(mut self: Self, request: Request<Incoming>) -> HandlerResult {
         let (parts, body) = request.into_parts();
         let method = &parts.method;
-        let path=parts.uri.to_string();
+        let (path,query)=match parts.uri.path_and_query()
+        {
+            Some(pq)=>{(pq.path(),pq.query())},
+            None=>("",None)
+        };
 
         println!("Method: {}, Path: {}", method, path);
 
-        let tree:Vec<&str>= path.split_terminator("/").collect();
+        let tree:Vec<&str>= path.split('/').collect(); //First entry is always ""
         
-        match tree.get(0)
+        println!("Path tree: {:?}",tree);
+    
+        match tree.get(1)
         {
             Some(first)=>{
-                match *first
+                if first.starts_with(ADMIN) //catches any instance where admin.html is directly requested
                 {
-                    ADMIN=>{
-                        let validator = |str:&str|{str=="Hahahaha!"};
-                        match check_basic_authentication(&parts, ADMIN, validator).await
-                        {
-                            Handler::Continue=>(),
-                            Handler::ImmediateReturn(response) => return response
-                        };
-                    },
-                    _=>()
+                    match check_basic_authentication(&parts, ADMIN, validator).await
+                    {
+                        Handler::Continue=>println!("Authenticated."),
+                        Handler::ImmediateReturn(response) => {println!("Not authenticated."); return response;}
+                    };
                 }
             }
             None=>()
         }
                 
-        match (method, path.as_str()) {
+        match (method, path) {
             (&Method::POST, BLOCK_DIVISION) => {
                 println!("Block division post.");
                 Self::handle_post(&mut self, parts,body).await
@@ -136,176 +140,203 @@ impl PostHandler {
 
         let mut response = {
             match serde_json::from_str::<BlockDivisionPost>(&as_string) {
-                Ok(request_body) => match request_body {
-                    BlockDivisionPost::GetStates(_) => {
-                        let res = PersistentDivision::get_all(&mut conn)
-                            .expect("Couldn't get all from persistent division table.");
-                        get_response(Some(res))
-                    }
-                    BlockDivisionPost::SetState(set_state_request) => {
-                        let res = match PersistentDivision::update(
-                            &mut conn,
-                            set_state_request.get_id().to_string(),
-                            set_state_request.get_state(),
-                        ) {
-                            Ok(_) => true,
-                            Err(_) => false,
-                        };
-                        get_response(Some(res))
-                    }
-                    BlockDivisionPost::NewBasis(new_basis_request) => {
-                        println!("New persistent division.");
-                        let res = match PersistentDivision::new(
-                            &mut conn,
-                            new_basis_request.get_id().to_string(),
-                            new_basis_request.get_basis(),
-                        ) {
-                            Ok(_) => true,
-                            Err(_) => false,
-                        };
+                Ok(request_body) =>
+                {
+                    //Check auth first
+                    let auth_realm = match &request_body {
+                        BlockDivisionPost::GetStates(_) => None,
+                        BlockDivisionPost::GetUserView(_) => None,
+                        BlockDivisionPost::SubmitSelections(_) => None,
+                        BlockDivisionPost::SetState(_) => Some(ADMIN),
+                        BlockDivisionPost::NewBasis(_) => Some(ADMIN),
+                        BlockDivisionPost::DeleteState(_) => Some(ADMIN),
+                        BlockDivisionPost::SendStartEmail(_) => Some(ADMIN),
+                    };
 
-                        get_response(Some(res))
+                    match auth_realm {
+                        Some(realm)=>{
+                            match check_basic_authentication(&parts, realm, validator).await
+                            {
+                                Handler::Continue=>println!("Authenticated."),
+                                Handler::ImmediateReturn(response) => {println!("Not authenticated."); return response;}
+                            };
+                        },
+                        None=>()
                     }
-                    BlockDivisionPost::DeleteState(delete_state_request) => {
-                        println!("Delete division.");
-                        let res = match PersistentDivision::delete_division(
-                            &mut conn,
-                            delete_state_request.get_id().to_string(),
-                        ) {
-                            Ok(_) => true,
-                            Err(_) => false,
-                        };
 
-                        get_response(Some(res))
-                    }
-                    BlockDivisionPost::GetUserView(get_user_view_request) => {
-                        match UserView::get(&mut conn, get_user_view_request.get_hash()) {
-                            Ok(user_view) => {
-                                println!("Got request for {:?}", user_view);
-                                get_user_view(&mut conn,&user_view)
-                            }
-                            Err(e) => generic_json_error_from_debug(e),
+                    //Handle if passed auth
+                    match request_body {
+                        BlockDivisionPost::GetStates(_) => {
+                            let res = PersistentDivision::get_all(&mut conn)
+                                .expect("Couldn't get all from persistent division table.");
+                            get_response(Some(res))
                         }
-                    }
-
-                    BlockDivisionPost::SendStartEmail(send_start_email) => {
-                        match mail::get_service_from_env() {
-                            Ok(mail_service) => {
-                                match PersistentDivision::get_state_from_id(
-                                    &mut conn,
-                                    send_start_email.get_state_id(),
-                                ) {
-                                    Ok(state) => match state {
-                                        Some(state) => {
-                                            match TryInto::<usize>::try_into(
-                                                send_start_email.get_user_id(),
-                                            ) {
-                                                Ok(user_id) => {
-                                                    match state
-                                                        .basis
-                                                        .get_participant_definitions()
-                                                        .get(user_id)
-                                                    {
-                                                        Some(user) => {
-                                                            if mail::is_valid_email(
-                                                                user.get_email(),
-                                                            ) {
-
-                                                                match send_start_email.set(&mut conn)
-                                                                {
-                                                                    Ok(_)=>{
-                                                                        let subject = format!(
-                                                                            "Block Division {} Started",
-                                                                            send_start_email.get_state_id()
-                                                                        );
-        
-                                                                        let hash =
-                                                                            send_start_email.get_hash();
-                                                                        
-                                                                        match &parts.headers.get(hyper::header::ORIGIN)//hyper::header::REFERER
-                                                                        {
-                                                                            Some(host)=>
+                        BlockDivisionPost::SetState(set_state_request) => {
+                            let res = match PersistentDivision::update(
+                                &mut conn,
+                                set_state_request.get_id().to_string(),
+                                set_state_request.get_state(),
+                            ) {
+                                Ok(_) => true,
+                                Err(_) => false,
+                            };
+                            get_response(Some(res))
+                        }
+                        BlockDivisionPost::NewBasis(new_basis_request) => {
+                            println!("New persistent division.");
+                            let res = match PersistentDivision::new(
+                                &mut conn,
+                                new_basis_request.get_id().to_string(),
+                                new_basis_request.get_basis(),
+                            ) {
+                                Ok(_) => true,
+                                Err(_) => false,
+                            };
+    
+                            get_response(Some(res))
+                        }
+                        BlockDivisionPost::DeleteState(delete_state_request) => {
+                            println!("Delete division.");
+                            let res = match PersistentDivision::delete_division(
+                                &mut conn,
+                                delete_state_request.get_id().to_string(),
+                            ) {
+                                Ok(_) => true,
+                                Err(_) => false,
+                            };
+    
+                            get_response(Some(res))
+                        }
+                        BlockDivisionPost::GetUserView(get_user_view_request) => {
+                            match UserView::get(&mut conn, get_user_view_request.get_hash()) {
+                                Ok(user_view) => {
+                                    println!("Got request for {:?}", user_view);
+                                    get_user_view(&mut conn,&user_view)
+                                }
+                                Err(e) => generic_json_error_from_debug(e),
+                            }
+                        }
+    
+                        BlockDivisionPost::SendStartEmail(send_start_email) => {
+                            match mail::get_service_from_env() {
+                                Ok(mail_service) => {
+                                    match PersistentDivision::get_state_from_id(
+                                        &mut conn,
+                                        send_start_email.get_state_id(),
+                                    ) {
+                                        Ok(state) => match state {
+                                            Some(state) => {
+                                                match TryInto::<usize>::try_into(
+                                                    send_start_email.get_user_id(),
+                                                ) {
+                                                    Ok(user_id) => {
+                                                        match state
+                                                            .basis
+                                                            .get_participant_definitions()
+                                                            .get(user_id)
+                                                        {
+                                                            Some(user) => {
+                                                                if mail::is_valid_email(
+                                                                    user.get_email(),
+                                                                ) {
+    
+                                                                    match send_start_email.set(&mut conn)
+                                                                    {
+                                                                        Ok(_)=>{
+                                                                            let subject = format!(
+                                                                                "Block Division {} Started",
+                                                                                send_start_email.get_state_id()
+                                                                            );
+            
+                                                                            let hash =
+                                                                                send_start_email.get_hash();
+                                                                            
+                                                                            match &parts.headers.get(hyper::header::ORIGIN)//hyper::header::REFERER
                                                                             {
-                                                                                match  host.to_str()
+                                                                                Some(host)=>
                                                                                 {
-                                                                                    Ok(url)=>{
-                                                                                        let body = email_body(url,&hash);
-        
-                                                                                        match mail::send_mail(
-                                                                                            &mail_service,
-                                                                                            user.get_email(),
-                                                                                            subject,
-                                                                                            body,
-                                                                                        ){
-                                                                                            Ok(r)=>{
-                                                                                                if r.is_positive() {
-                                                                                                    get_response(Some(true))
-                                                                                                }else {
-                                                                                                    generic_json_error(&format!("Couldn't send e-mail to {}, error: {}",user.get_email(),r.code()))
-                                                                                                }
-                                                                                                },Err(e)=>{generic_json_error_from_debug(e)}
+                                                                                    match  host.to_str()
+                                                                                    {
+                                                                                        Ok(url)=>{
+                                                                                            let body = email_body(url,&hash);
+            
+                                                                                            match mail::send_mail(
+                                                                                                &mail_service,
+                                                                                                user.get_email(),
+                                                                                                subject,
+                                                                                                body,
+                                                                                            ){
+                                                                                                Ok(r)=>{
+                                                                                                    if r.is_positive() {
+                                                                                                        get_response(Some(true))
+                                                                                                    }else {
+                                                                                                        generic_json_error(&format!("Couldn't send e-mail to {}, error: {}",user.get_email(),r.code()))
+                                                                                                    }
+                                                                                                    },Err(e)=>{generic_json_error_from_debug(e)}
+                                                                                            }
                                                                                         }
+                                                                                        Err(e)=>generic_json_error_from_debug(e)
                                                                                     }
-                                                                                    Err(e)=>generic_json_error_from_debug(e)
+                                                                                    
                                                                                 }
-                                                                                
+                                                                                None=>
+                                                                                {
+                                                                                    generic_json_error(&format!(
+                                                                                        "Request contained no host"
+                                                                                    ))
+                                                                                }
                                                                             }
-                                                                            None=>
-                                                                            {
-                                                                                generic_json_error(&format!(
-                                                                                    "Request contained no host"
-                                                                                ))
-                                                                            }
-                                                                        }
-                                                                        
-                                                                    },
-                                                                    Err(e)=>generic_json_error_from_debug(e)
+                                                                            
+                                                                        },
+                                                                        Err(e)=>generic_json_error_from_debug(e)
+                                                                    }
+                                                                    
+                                                                } else {
+                                                                    generic_json_error(&format!(
+                                                                        "Invalid email {}",
+                                                                        user.get_email()
+                                                                    ))
                                                                 }
-                                                                
-                                                            } else {
-                                                                generic_json_error(&format!(
-                                                                    "Invalid email {}",
-                                                                    user.get_email()
-                                                                ))
                                                             }
+                                                            None => generic_json_error("No such user."),
                                                         }
-                                                        None => generic_json_error("No such user."),
                                                     }
+                                                    Err(e) => generic_json_error("Invalid index."),
                                                 }
-                                                Err(e) => generic_json_error("Invalid index."),
                                             }
-                                        }
-                                        None => generic_json_error("No such state."),
-                                    },
-                                    Err(e) => generic_json_error_from_debug(e),
-                                }
-                            }
-                            Err(e) => generic_json_error_from_debug(e),
-                        }
-                    }
-                    BlockDivisionPost::SubmitSelections(submit_selections) => {
-                        match self.get_block_division_lock(&submit_selections.state_id)
-                        {
-                            Ok(lock) => {
-                                match lock.lock(){
-                                    Ok(_)=>{
-                                        match BlockDivisionState::set_selections_for_current_round(&mut conn, 
-                                            submit_selections.state_id.to_string(),  
-                                            submit_selections.user_id, 
-                                            submit_selections.selections){
-                                                Ok(_) => {
-                                                    get_user_view(&mut conn,&UserView::create(submit_selections.user_id as i32,submit_selections.state_id))
-                                                },
-                                                Err(e) => generic_json_error_from_debug(e),
-                                            }
+                                            None => generic_json_error("No such state."),
+                                        },
+                                        Err(e) => generic_json_error_from_debug(e),
                                     }
-                                    Err(_) => generic_json_error("Couldn't lock block id."),
                                 }
-                            },
-                            Err(e) => generic_json_error_from_debug(e),
+                                Err(e) => generic_json_error_from_debug(e),
+                            }
                         }
-                    },
-                },
+                        BlockDivisionPost::SubmitSelections(submit_selections) => {
+                            match self.get_block_division_lock(&submit_selections.state_id)
+                            {
+                                Ok(lock) => {
+                                    match lock.lock(){
+                                        Ok(_)=>{
+                                            match BlockDivisionState::set_selections_for_current_round(&mut conn, 
+                                                submit_selections.state_id.to_string(),  
+                                                submit_selections.user_id, 
+                                                submit_selections.selections){
+                                                    Ok(_) => {
+                                                        get_user_view(&mut conn,&UserView::create(submit_selections.user_id as i32,submit_selections.state_id))
+                                                    },
+                                                    Err(e) => generic_json_error_from_debug(e),
+                                                }
+                                        }
+                                        Err(_) => generic_json_error("Couldn't lock block id."),
+                                    }
+                                },
+                                Err(e) => generic_json_error_from_debug(e),
+                            }
+                        },
+                    }
+                }
+               ,
                 Err(err) => generic_json_error_from_debug(err),
             }
         };
