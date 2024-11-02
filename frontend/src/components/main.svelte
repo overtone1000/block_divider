@@ -28,6 +28,7 @@
 	let message: string = "Loading";
 	let view: UserViewResult | undefined = undefined;
 	let urlhash: string | null = null;
+	let title: string = "Block Division";
 
 	let callback = (result: BlockDivisionPostResult) => {
 		if (typeof result === "object") {
@@ -82,6 +83,7 @@
 	$: {
 		console.debug("View:", view);
 		if (view !== undefined) {
+			title = view.state_id + " - " + view.state.basis.participant_definitions[view.user_id].name;
 			selections = [];
 			let current_open_round = view.state.current_open_round;
 			console.debug("Current open round:", current_open_round);
@@ -104,7 +106,7 @@
 	}
 </script>
 
-<Container title="Block Division">
+<Container {title}>
 	<div slot="contents">
 		{#if view === undefined}
 			<div>{message}</div>

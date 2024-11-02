@@ -9,6 +9,7 @@ use std::{
     f32::consts::E,
     hash::{Hash, Hasher},
     io::{BufReader, BufWriter},
+    thread::current,
 };
 
 use serde::{Deserialize, Serialize};
@@ -92,6 +93,7 @@ impl BlockDivisionState {
                             state
                                 .selections
                                 .set(current_open_round, participant_index, selections);
+
                             state.determine_designations_from_current_selections();
 
                             state.save_state(state_id, conn)
@@ -111,7 +113,14 @@ impl BlockDivisionState {
     }
 
     fn determine_designations_from_current_selections(&mut self) {
-        let mut selections_to_attempt: Vec<(usize, ParticipantIndex, Selection)> = Vec::new();
+        struct SelectionInstance {
+            rank: usize,
+            round: RoundIndex,
+            participant: ParticipantIndex,
+            selection: Selection,
+        }
+
+        let mut selections_to_attempt: Vec<SelectionInstance> = Vec::new();
 
         for round in 0..self.basis.get_selection_rounds().len() {
             match self.selections.get(&round) {
@@ -120,11 +129,19 @@ impl BlockDivisionState {
                         for selection in selections.iter() {
                             match selection {
                                 Some(selection) => {
-                                    selections_to_attempt.push((
-                                        round,
-                                        participant.clone(),
-                                        selection.clone(),
-                                    ));
+                                    let rank = self
+                                        .bucket_states
+                                        .get(selection.bucket_index)
+                                        .expect("Should exist.")
+                                        .get_state(&round)
+                                        .get_rank(participant);
+
+                                    selections_to_attempt.push(SelectionInstance {
+                                        rank: *rank,
+                                        round: round,
+                                        participant: participant.clone(),
+                                        selection: selection.clone(),
+                                    });
                                 }
                                 None => { //Do Nothing}
                                 }
@@ -138,8 +155,29 @@ impl BlockDivisionState {
             };
         }
 
-        for (round, participant, selection) in selections_to_attempt {
-            self.attempt_selection(&round, &participant, &selection);
+        //Clear all designations
+        for state in &mut self.bucket_states {
+            for state in state.get_states_mut() {
+                state.designations.clear();
+                state.ancillary_designations.clear();
+            }
+        }
+
+        //Sort selections to attempt in order of highest rank to lowest rank
+        selections_to_attempt
+            .sort_by(|a: &SelectionInstance, b: &SelectionInstance| a.rank.cmp(&b.rank));
+        for selection_instance in selections_to_attempt {
+            println!(
+                "Selection rank: {}, participant {}, bucket {}",
+                selection_instance.rank,
+                selection_instance.participant,
+                selection_instance.selection.bucket_index
+            );
+            self.attempt_selection(
+                &selection_instance.round,
+                &selection_instance.participant,
+                &selection_instance.selection,
+            );
         }
     }
 
@@ -285,6 +323,10 @@ impl BlockDivisionState {
                     Some(current_ancillary_designee) => {
                         if !round_state.is_winner(participant, current_ancillary_designee) {
                             //Can't get ancillary, so selection is denied
+                            println!(
+                                "{} beat {} for ancillary {}",
+                                current_ancillary_designee, participant, ancillary_designation
+                            );
                             return false;
                         }
                     }

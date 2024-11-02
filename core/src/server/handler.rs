@@ -63,7 +63,8 @@ impl StatefulHandler for PostHandler {
                     match check_basic_authentication(&parts, ADMIN, validator).await
                     {
                         Handler::Continue=>println!("Authenticated."),
-                        Handler::ImmediateReturn(response) => {println!("Not authenticated."); return response;}
+                        Handler::ImmediateReturn(response) => {println!("Not authenticated."); return Ok(permit_all_cors(response));}
+                        Handler::Error(e)=>{return Err(e)}
                     };
                 }
             }
@@ -158,7 +159,8 @@ impl PostHandler {
                             match check_basic_authentication(&parts, realm, validator).await
                             {
                                 Handler::Continue=>println!("Authenticated."),
-                                Handler::ImmediateReturn(response) => {println!("Not authenticated."); return response;}
+                                Handler::ImmediateReturn(response) => {println!("Not authenticated."); return Ok(permit_all_cors(response));}
+                                Handler::Error(e)=>{return Err(e)}
                             };
                         },
                         None=>()
@@ -244,9 +246,9 @@ impl PostHandler {
                                                                     {
                                                                         Ok(_)=>{
                                                                             let subject = format!(
-                                                                                "{}, block division {} has started",
-                                                                                user.get_name(),
-                                                                                send_start_email.get_state_id()
+                                                                                "{} - {}",
+                                                                                send_start_email.get_state_id(),
+                                                                                user.get_name()
                                                                             );
             
                                                                             let hash =
