@@ -13,6 +13,7 @@
 		BlockDivisionStateList
 	} from "../../post/results/block_division_state";
 	import ModifiableBucketList from "../modifiable_lists/modifiable_bucket_list.svelte";
+	import ModifiableParticipantList from "../modifiable_lists/modifiable_participant_list.svelte";
 	import { DisplayMode, handle_error } from "../../commons/commons";
 	import type { Basis } from "../../post/results/state_components/basis";
 	import ModifiableStringList from "../modifiable_lists/commons/modifiable_string_list.svelte";
@@ -77,38 +78,14 @@
 		<div class="toplabel">
 			<Textfield style="width:100%" label="Label" bind:value={id} />
 		</div>
-		<div class="list">
+		<div class="area">
 			Buckets
-			<ModifiableBucketList bucket_definitions={basis.bucket_definitions} />
+			<ModifiableBucketList bind:bucket_definitions={basis.bucket_definitions} />
 		</div>
 
 		<div class="area">
 			Participants
-			<div class="list">
-				{#each basis.participant_definitions as participant_definition}
-					<div class="area row">
-						<div class="col textboxwidth">
-							<Textfield label="Participant Name" bind:value={participant_definition.name} />
-							<Textfield label="E-mail" type="email" bind:value={participant_definition.email} />
-						</div>
-						<div class="area col">
-							Picks allowed per round
-							<div class="row">
-								{#each Object.keys(participant_definition.round_picks_allowed) as picks_allowed_index}
-									<Textfield
-										bind:value={participant_definition.round_picks_allowed[
-											parseInt(picks_allowed_index)
-										]}
-										label={basis.selection_round_names[parseInt(picks_allowed_index)]}
-										type="number"
-										input$step="1"
-									/>
-								{/each}
-							</div>
-						</div>
-					</div>
-				{/each}
-			</div>
+			<ModifiableParticipantList bind:participants={basis.participant_definitions} />
 		</div>
 
 		<div class="area">
