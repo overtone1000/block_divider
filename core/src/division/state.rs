@@ -271,14 +271,14 @@ impl BlockDivisionState {
         println!("{}", serialized);
     }
 
-    fn slots_available_this_round(&self, bucket_index: &usize, round: &usize) -> usize {
+    fn slots_available_this_round(&self, bucket_index: &usize, current_round: &usize) -> usize {
         let mut used_slots: usize = 0;
-        for current_round in 0..self.basis.get_selection_rounds().len() {
+        for previous_round in 0..current_round - 1 {
             used_slots += self
                 .bucket_states
                 .get(*bucket_index)
                 .expect("Bucket should exist.")
-                .get_state(&current_round)
+                .get_state(&previous_round)
                 .designations
                 .len() as usize;
         }
@@ -407,8 +407,6 @@ impl BlockDivisionState {
 
 #[cfg(test)]
 mod tests {
-    use std::char::ParseCharError;
-
     use bucket::AncillaryIndex;
 
     use crate::db::{division::PersistentDivision, establish_connection};
