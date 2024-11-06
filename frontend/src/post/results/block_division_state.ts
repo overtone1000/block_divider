@@ -7,6 +7,7 @@ export type BlockDivisionStateList = { [label: string]: BlockDivisionState }
 export interface BlockDivisionSelection {
     bucket_index: BucketIndex;
     ancillaries: AncillaryIndex[];
+    state: "Confirmed" | "RejectedOutranked" | "RejectedNoSelectionsThisRound" | { RejectedAncillaryUnavailable: number[] } | null
 }
 
 export type BlockDivisionSelectionEntry = BlockDivisionSelection | null;

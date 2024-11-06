@@ -5,12 +5,12 @@
     "tasks": [
         {
             "type": "npm",
-            "script": "build_and_deploy",
+            "script": "build",
             "path": "frontend",
             "group": "build",
             "problemMatcher": [],
-            "label": "Frontend - Build and Deploy",
-            "detail": "vite build && bash ../deploy/testing_autoscheda_deploy.sh"
+            "label": "Frontend - Build",
+            "detail": "vite build"
         },
         {
             "type": "npm",

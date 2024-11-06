@@ -331,7 +331,12 @@ impl PostHandler {
                                                     Err(e) => generic_json_error_from_debug(e),
                                                 }
                                         }
-                                        Err(_) => generic_json_error("Couldn't lock block id."),
+                                        Err(_) => {
+                                            if lock.is_poisoned()
+                                            {
+                                                lock.clear_poison();
+                                            }
+                                            generic_json_error("Couldn't lock block id. Please try again. If this problem persists, contact the administrator.")},
                                     }
                                 },
                                 Err(e) => generic_json_error_from_debug(e),

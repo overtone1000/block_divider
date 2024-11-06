@@ -9,9 +9,18 @@ use super::{
 };
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, PartialOrd, Ord, Clone)]
+pub enum SelectionResult {
+    Confirmed,
+    RejectedOutranked,
+    RejectedNoSelectionsThisRound,
+    RejectedAncillaryUnavailable(Vec<usize>),
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, PartialOrd, Ord, Clone)]
 pub struct Selection {
     pub(crate) bucket_index: usize,
     pub(crate) ancillaries: BTreeSet<usize>, //this is where Black Butte will go but opens it to other possibilities
+    pub(crate) state: Option<SelectionResult>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, PartialOrd, Ord, Clone)]
@@ -76,13 +85,14 @@ impl Selections {
 mod tests {
     use std::collections::BTreeSet;
 
-    use super::Selection;
+    use super::{Selection, SelectionResult};
 
     #[test]
     fn selection_serialization() {
         let s = Selection {
             bucket_index: 35,
             ancillaries: BTreeSet::from([15, 22, 18]),
+            state: None,
         };
 
         let str = serde_json::to_string(&s).expect("Should serialize.");
@@ -90,5 +100,22 @@ mod tests {
 
         let res = serde_json::from_str(&str).expect("Should deserialize.");
         assert!(s == res);
+    }
+
+    #[test]
+    fn result_serialization() {
+        let res = [
+            SelectionResult::Confirmed,
+            SelectionResult::RejectedOutranked,
+            SelectionResult::RejectedNoSelectionsThisRound,
+            SelectionResult::RejectedAncillaryUnavailable(Vec::from([0, 1, 2])),
+        ];
+
+        for r in res {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&r).expect("Should serialize.")
+            );
+        }
     }
 }

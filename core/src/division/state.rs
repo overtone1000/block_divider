@@ -21,7 +21,7 @@ use super::{
     bucket::{self, BucketDef, BucketIndex, BucketState, BucketStates, Ranks, RoundStates},
     participant::{ParticipantDef, ParticipantIndex},
     round::{RoundIndex, RoundName},
-    selections::{Selection, Selections},
+    selections::{Selection, SelectionResult, Selections},
 };
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
@@ -123,6 +123,7 @@ impl BlockDivisionState {
         let mut selections_to_attempt: Vec<SelectionInstance> = Vec::new();
 
         for round in 0..self.basis.get_selection_rounds().len() {
+            println!("Getting selections for round {}", round);
             match self.selections.get(&round) {
                 Some(participant_selections_map) => {
                     for (participant, selections) in participant_selections_map {
@@ -166,19 +167,22 @@ impl BlockDivisionState {
         //Sort selections to attempt in order of highest rank to lowest rank
         selections_to_attempt
             .sort_by(|a: &SelectionInstance, b: &SelectionInstance| a.rank.cmp(&b.rank));
-        for selection_instance in selections_to_attempt {
+        for mut selection_instance in selections_to_attempt {
             println!(
                 "Selection rank: {}, participant {}, bucket {}",
                 selection_instance.rank,
                 selection_instance.participant,
                 selection_instance.selection.bucket_index
             );
-            self.attempt_selection(
+            let result = self.attempt_selection(
                 &selection_instance.round,
                 &selection_instance.participant,
                 &selection_instance.selection,
             );
+            selection_instance.selection.state = Some(result);
         }
+
+        //Caller must save state so selection results persist.
     }
 
     fn save_state(
@@ -273,14 +277,17 @@ impl BlockDivisionState {
 
     fn slots_available_this_round(&self, bucket_index: &usize, current_round: &usize) -> usize {
         let mut used_slots: usize = 0;
-        for previous_round in 0..current_round - 1 {
-            used_slots += self
-                .bucket_states
-                .get(*bucket_index)
-                .expect("Bucket should exist.")
-                .get_state(&previous_round)
-                .designations
-                .len() as usize;
+
+        if current_round > &0 {
+            for previous_round in 0..current_round - 1 {
+                used_slots += self
+                    .bucket_states
+                    .get(*bucket_index)
+                    .expect("Bucket should exist.")
+                    .get_state(&previous_round)
+                    .designations
+                    .len() as usize;
+            }
         }
 
         let available_slots = self
@@ -298,7 +305,7 @@ impl BlockDivisionState {
         round: &usize,
         participant: &ParticipantIndex,
         selection: &Selection,
-    ) -> bool {
+    ) -> SelectionResult {
         let winners = {
             let bucket_states = self
                 .bucket_states
@@ -307,13 +314,14 @@ impl BlockDivisionState {
             let round_state = bucket_states.get_state(&round);
 
             //Check ancillary designations first. If this participant loses any, reject the selection
+            let mut unavailable_ancillaries: Vec<usize> = Vec::new();
             for ancillary_designation in &selection.ancillaries {
                 if !bucket_states.ancillary_designation_is_available_for_this_round(
                     &round,
                     &ancillary_designation,
                 ) {
                     //Can't get ancillary, so selection is denied
-                    return false;
+                    unavailable_ancillaries.push(*ancillary_designation);
                 }
 
                 match round_state
@@ -327,14 +335,20 @@ impl BlockDivisionState {
                                 "{} beat {} for ancillary {}",
                                 current_ancillary_designee, participant, ancillary_designation
                             );
-                            return false;
+                            unavailable_ancillaries.push(*ancillary_designation);
                         }
                     }
                     None => {}
                 }
             }
+            if unavailable_ancillaries.len() > 0 {
+                return SelectionResult::RejectedAncillaryUnavailable(unavailable_ancillaries);
+            }
 
             let slots_available = self.slots_available_this_round(&selection.bucket_index, round);
+            if slots_available <= 0 {
+                return SelectionResult::RejectedNoSelectionsThisRound;
+            }
 
             let mut candidates: BTreeSet<ParticipantIndex> =
                 round_state.designations.clone().into_iter().collect();
@@ -359,9 +373,9 @@ impl BlockDivisionState {
                     .insert(*ancillary_designation, *participant);
             }
 
-            true
+            SelectionResult::Confirmed
         } else {
-            false
+            SelectionResult::RejectedOutranked
         }
     }
 
@@ -551,6 +565,7 @@ mod tests {
             selections_a.push(Some(Selection {
                 bucket_index: current_bucket_index,
                 ancillaries: ancillaries_a.clone(),
+                state: None,
             }));
         }
 

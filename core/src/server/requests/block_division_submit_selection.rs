@@ -32,11 +32,13 @@ mod tests {
                 Some(Selection {
                     bucket_index: 5,
                     ancillaries: BTreeSet::from([6, 7]),
+                    state: None,
                 }),
                 None,
                 Some(Selection {
                     bucket_index: 8,
                     ancillaries: BTreeSet::from([9, 10, 11, 12]),
+                    state: None,
                 }),
                 None,
             ]),

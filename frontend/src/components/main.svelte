@@ -171,7 +171,8 @@
 										if (selection === null) {
 											selection = {
 												bucket_index: 0,
-												ancillaries: []
+												ancillaries: [],
+												state: null
 											};
 										} else {
 											selection = null;
@@ -212,6 +213,13 @@
 											/>
 											<span slot="label">{available_ancillary}</span>
 										</FormField>
+										{#if selection?.state !== null}
+											<div>
+												Result: {selection?.state}
+											</div>
+										{:else}
+											No selection state {JSON.stringify(selection)}
+										{/if}
 									{/each}
 								{:else}
 									<Select disabled={true} label="Selection"></Select>
