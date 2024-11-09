@@ -26,10 +26,10 @@ use super::{
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct BlockDivisionState {
-    pub basis: BlockDivisionBasis,
-    pub bucket_states: BucketStates,
-    pub selections: Selections,
-    pub current_open_round: Option<RoundIndex>,
+    basis: BlockDivisionBasis,
+    bucket_states: BucketStates,
+    selections: Selections,
+    current_open_round: Option<RoundIndex>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -42,6 +42,18 @@ pub struct BlockDivisionInput {
 //const STATE_CACHE_PATH: &str = "./state_cache/";
 
 impl BlockDivisionState {
+    pub fn get_basis(&self) -> &BlockDivisionBasis {
+        &self.basis
+    }
+
+    pub fn get_current_open_round(&self) -> &Option<RoundIndex> {
+        &self.current_open_round
+    }
+
+    pub fn get_bucket_states_mut(&mut self) -> &mut BucketStates {
+        &mut self.bucket_states
+    }
+
     pub fn new(basis: &BlockDivisionBasis) -> BlockDivisionState {
         let mut bucket_states: BucketStates = Vec::new();
         for bucket_index in 0..basis.get_bucket_definitions().len() {
@@ -67,10 +79,8 @@ impl BlockDivisionState {
         selections: Vec<Option<Selection>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         match PersistentDivision::get_from_id(conn, &state_id) {
-            Some(pd) => {
-                let mut state = pd.get_state();
-
-                match state.current_open_round {
+            Some(pd) => match pd.as_state() {
+                Ok(mut state) => match state.current_open_round {
                     Some(current_open_round) => {
                         let pick_count = state
                             .basis
@@ -103,8 +113,9 @@ impl BlockDivisionState {
                         std::io::ErrorKind::InvalidInput,
                         format!("Selections are closed."),
                     ))),
-                }
-            }
+                },
+                Err(e) => Err(e),
+            },
             None => Err(Box::new(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 format!("No state with id {}", state_id),
@@ -385,32 +396,33 @@ impl BlockDivisionState {
         round_index: Option<usize>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         match PersistentDivision::get_from_id(conn, &state_id) {
-            Some(pd) => {
-                let mut state = pd.get_state();
-
-                match round_index {
-                    Some(round_index) => {
-                        let mut contains_key = false;
-                        for key in 0..state.basis.get_selection_rounds().len() {
-                            if key == round_index {
-                                state.current_open_round = Some(round_index);
-                                contains_key = true;
-                                break;
+            Some(pd) => match pd.as_state() {
+                Ok(mut state) => {
+                    match round_index {
+                        Some(round_index) => {
+                            let mut contains_key = false;
+                            for key in 0..state.basis.get_selection_rounds().len() {
+                                if key == round_index {
+                                    state.current_open_round = Some(round_index);
+                                    contains_key = true;
+                                    break;
+                                }
+                            }
+                            if !contains_key {
+                                return Err(Box::new(std::io::Error::new(
+                                    std::io::ErrorKind::InvalidInput,
+                                    format!("Invalid round index {}.", round_index),
+                                )));
                             }
                         }
-                        if !contains_key {
-                            return Err(Box::new(std::io::Error::new(
-                                std::io::ErrorKind::InvalidInput,
-                                format!("Invalid round index {}.", round_index),
-                            )));
-                        }
-                    }
-                    None => {}
-                };
+                        None => {}
+                    };
 
-                state.current_open_round = round_index;
-                state.save_state(state_id, conn)
-            }
+                    state.current_open_round = round_index;
+                    state.save_state(state_id, conn)
+                }
+                Err(e) => Err(e),
+            },
             None => Err(Box::new(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 format!("No state with id {}", state_id),
@@ -517,7 +529,7 @@ mod tests {
 
         let pd = PersistentDivision::new(&mut conn, id1.to_string(), &basis) //recreate to test ignoring
             .expect("Should work.");
-        let bds = pd.get_state();
+        let bds = pd.as_state().expect("Should be a state.");
 
         println!("----------------------");
         println!("Block Division State Serialization:");
@@ -527,7 +539,7 @@ mod tests {
 
         let pd2 = PersistentDivision::new(&mut conn, id2.to_string(), &basis) //recreate to test equivalence
             .expect("Should work.");
-        let bds2 = pd2.get_state();
+        let bds2 = pd2.as_state().expect("Should be a state.");
 
         assert!(pd != pd2); //Should have different ids.
         assert!(bds.basis == bds2.basis); //But basis should be identical
@@ -582,7 +594,8 @@ mod tests {
 
         let bds = PersistentDivision::get_from_id(&mut conn, id1)
             .expect("Should exist.")
-            .get_state();
+            .as_state()
+            .expect("Should be a state.");
         assert!(current_round_index == bds.current_open_round.expect("Should not be none."));
 
         //bds.determine_designations_from_current_selections(); //This is called internally by the set_selections_for_current_fround function.

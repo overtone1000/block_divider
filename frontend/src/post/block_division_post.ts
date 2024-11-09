@@ -3,7 +3,7 @@ import type { GetStates } from "./posts/get_states";
 import type { GetUserView } from "./posts/get_user_view";
 import type { NewBasis } from "./posts/new_basis";
 import type { SendStartEmail } from "./posts/send_start_email";
-import type { SetState } from "./posts/set_state";
+import type { SetState } from "./posts/set_open_round";
 import type { SubmitSelections } from "./posts/submit_selections";
 import type { BlockDivisionState, BlockDivisionStateList } from "./results/block_division_state";
 

@@ -125,6 +125,28 @@ impl PostHandler {
         }
     }
 
+    fn run_in_lock<T>(&self, id:&str, func:T) -> Response<HandlerBody> 
+    where T:FnOnce()->Response<HandlerBody>
+    {
+        match self.get_block_division_lock(id)
+        {
+            Ok(lock) => {
+                match lock.lock(){
+                    Ok(_)=>{
+                        func()
+                    }
+                    Err(_) => {
+                        if lock.is_poisoned()
+                        {
+                            lock.clear_poison();
+                        }
+                        generic_json_error("Couldn't lock block id. Please try again. If this problem persists, contact the administrator.")},
+                }
+            },
+            Err(e) => generic_json_error_from_debug(e),
+        }
+    }
+
     async fn handle_post(&mut self, parts: hyper::http::request::Parts, body:Incoming) -> HandlerResult {
 
         let as_string = get_request_body_as_string(body).await?;
@@ -148,7 +170,7 @@ impl PostHandler {
                         BlockDivisionPost::GetStates(_) => None,
                         BlockDivisionPost::GetUserView(_) => None,
                         BlockDivisionPost::SubmitSelections(_) => None,
-                        BlockDivisionPost::SetState(_) => Some(ADMIN),
+                        BlockDivisionPost::SetOpenRound(_) => Some(ADMIN),
                         BlockDivisionPost::NewBasis(_) => Some(ADMIN),
                         BlockDivisionPost::DeleteState(_) => Some(ADMIN),
                         BlockDivisionPost::SendStartEmail(_) => Some(ADMIN),
@@ -173,16 +195,17 @@ impl PostHandler {
                                 .expect("Couldn't get all from persistent division table.");
                             get_response(Some(res))
                         }
-                        BlockDivisionPost::SetState(set_state_request) => {
-                            let res = match PersistentDivision::update(
-                                &mut conn,
-                                set_state_request.get_id().to_string(),
-                                set_state_request.get_state(),
-                            ) {
-                                Ok(_) => true,
-                                Err(_) => false,
+                        BlockDivisionPost::SetOpenRound(set_round_request) => {
+                            let id = set_round_request.get_id().to_string();
+                            let func = ||{
+                                let res = BlockDivisionState::set_open_round(&mut conn, set_round_request.get_id().to_string(), *set_round_request.get_round());
+                                match res
+                                {
+                                    Ok(_) => get_response(Some(true)),
+                                    Err(e) => generic_json_error_from_debug(e),
+                                }
                             };
-                            get_response(Some(res))
+                            self.run_in_lock(&id, func)
                         }
                         BlockDivisionPost::NewBasis(new_basis_request) => {
                             println!("New persistent division.");
@@ -233,7 +256,7 @@ impl PostHandler {
                                                 ) {
                                                     Ok(user_id) => {
                                                         match state
-                                                            .basis
+                                                            .get_basis()
                                                             .get_participant_definitions()
                                                             .get(user_id)
                                                         {
@@ -316,31 +339,19 @@ impl PostHandler {
                             }
                         }
                         BlockDivisionPost::SubmitSelections(submit_selections) => {
-                            match self.get_block_division_lock(&submit_selections.state_id)
-                            {
-                                Ok(lock) => {
-                                    match lock.lock(){
-                                        Ok(_)=>{
-                                            match BlockDivisionState::set_selections_for_current_round(&mut conn, 
-                                                submit_selections.state_id.to_string(),  
-                                                submit_selections.user_id, 
-                                                submit_selections.selections){
-                                                    Ok(_) => {
-                                                        get_user_view(&mut conn,&UserView::create(submit_selections.user_id as i32,submit_selections.state_id))
-                                                    },
-                                                    Err(e) => generic_json_error_from_debug(e),
-                                                }
-                                        }
-                                        Err(_) => {
-                                            if lock.is_poisoned()
-                                            {
-                                                lock.clear_poison();
-                                            }
-                                            generic_json_error("Couldn't lock block id. Please try again. If this problem persists, contact the administrator.")},
+                            let id = submit_selections.state_id.to_string();
+                            let func = ||{
+                                match BlockDivisionState::set_selections_for_current_round(&mut conn, 
+                                    submit_selections.state_id.to_string(),  
+                                    submit_selections.user_id, 
+                                    submit_selections.selections){
+                                        Ok(_) => {
+                                            get_user_view(&mut conn,&UserView::create(submit_selections.user_id as i32,submit_selections.state_id))
+                                        },
+                                        Err(e) => generic_json_error_from_debug(e),
                                     }
-                                },
-                                Err(e) => generic_json_error_from_debug(e),
-                            }
+                            };
+                            self.run_in_lock(&id, func)
                         },
                     }
                 }
@@ -392,7 +403,7 @@ fn get_user_view(conn:&mut PgConnection,user_view:&UserView)->Response<HandlerBo
         Ok(state) => match state {
             Some(mut state)=>{
                 //Censor the final state
-                let start = match state.current_open_round
+                let start = match state.get_current_open_round()
                 {
                     Some(start)=>{
                         start+1
@@ -401,9 +412,9 @@ fn get_user_view(conn:&mut PgConnection,user_view:&UserView)->Response<HandlerBo
                         0
                     }
                 };
-                let fin =state.basis.get_selection_rounds().len();
+                let fin =state.get_basis().get_selection_rounds().len();
                 println!("Censoring rounds {} - {}",start,fin-1);
-                for bucket_state in &mut state.bucket_states
+                for bucket_state in state.get_bucket_states_mut()
                 {
                     for round in start..fin
                     {

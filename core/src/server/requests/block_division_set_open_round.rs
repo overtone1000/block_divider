@@ -3,17 +3,17 @@ use serde::{Deserialize, Serialize};
 use crate::division::state::BlockDivisionState;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
-pub struct SetStateRequest {
+pub struct SetOpenRoundRequest {
     id: String,
-    state: BlockDivisionState,
+    round: Option<usize>,
 }
 
-impl SetStateRequest {
+impl SetOpenRoundRequest {
     pub fn get_id(&self) -> &str {
         &self.id
     }
 
-    pub fn get_state(&self) -> &BlockDivisionState {
-        &self.state
+    pub fn get_round(&self) -> &Option<usize> {
+        &self.round
     }
 }

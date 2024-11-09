@@ -23,9 +23,9 @@ impl PersistentDivision {
         self.id.to_string()
     }
 
-    pub fn get_state(&self) -> BlockDivisionState {
-        serde_json::from_str(&self.serialized).expect("Couldn't deserialize persistent division.")
-    }
+    //pub fn get_state(&self) -> BlockDivisionState {
+    //    serde_json::from_str(&self.serialized).expect("Couldn't deserialize persistent division.")
+    //}
 
     pub fn get_from_id(conn: &mut PgConnection, id: &str) -> Option<PersistentDivision> {
         let retval = divisions::table
@@ -89,7 +89,7 @@ impl PersistentDivision {
         Ok(())
     }
 
-    fn as_state(&self) -> Result<BlockDivisionState, Box<dyn std::error::Error>> {
+    pub fn as_state(&self) -> Result<BlockDivisionState, Box<dyn std::error::Error>> {
         let str = self.serialized.as_str();
         Ok(serde_json::from_str(str)?)
     }
