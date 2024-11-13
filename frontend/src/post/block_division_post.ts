@@ -1,9 +1,9 @@
 import type { DeleteState } from "./posts/delete_state";
 import type { GetStates } from "./posts/get_states";
-import type { GetUserView } from "./posts/get_user_view";
+import type { GetUserView, GetUserViewAsAdmin } from "./posts/get_user_view";
 import type { NewBasis } from "./posts/new_basis";
 import type { SendStartEmail } from "./posts/send_start_email";
-import type { SetState } from "./posts/set_open_round";
+import type { SetOpenRound } from "./posts/set_open_round";
 import type { SubmitSelections } from "./posts/submit_selections";
 import type { BlockDivisionState, BlockDivisionStateList } from "./results/block_division_state";
 
@@ -11,13 +11,14 @@ export type BlockDivisionPost =
     { GetUserView: GetUserView } |
     { SubmitSelections: SubmitSelections } |
     { GetStates: GetStates } |
-    { SetState: SetState } |
+    { SetOpenRound: SetOpenRound } |
     { NewBasis: NewBasis } |
     { DeleteState: DeleteState } |
-    { SendStartEmail: SendStartEmail };
+    { SendStartEmail: SendStartEmail } |
+    { GetUserViewAsAdmin: GetUserViewAsAdmin };
 
 export type ErrorResult = { error: Error };
-export type UserViewResult = { user_id: number, state_id: string, state: BlockDivisionState };
+export type UserViewResult = { user_id?: number, state_id: string, state: BlockDivisionState };
 export type BlockDivisionPostResult =
     ErrorResult |
     BlockDivisionStateList |

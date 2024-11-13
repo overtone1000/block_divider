@@ -67,6 +67,13 @@ impl Selections {
         self.state.get(round)
     }
 
+    pub fn get_mut(
+        &mut self,
+        round: &usize,
+    ) -> Option<&mut BTreeMap<ParticipantIndex, Vec<Option<Selection>>>> {
+        self.state.get_mut(round)
+    }
+
     pub fn set(
         &mut self,
         round: usize,

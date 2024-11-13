@@ -128,6 +128,7 @@ impl BlockDivisionState {
             rank: usize,
             round: RoundIndex,
             participant: ParticipantIndex,
+            selection_index: usize,
             selection: Selection,
         }
 
@@ -135,6 +136,7 @@ impl BlockDivisionState {
 
         for round in 0..self.basis.get_selection_rounds().len() {
             println!("Getting selections for round {}", round);
+
             match self.selections.get(&round) {
                 Some(participant_selections_map) => {
                     for (participant, selections) in participant_selections_map {
@@ -152,6 +154,7 @@ impl BlockDivisionState {
                                         rank: *rank,
                                         round: round,
                                         participant: participant.clone(),
+                                        selection_index: round,
                                         selection: selection.clone(),
                                     });
                                 }
@@ -190,7 +193,34 @@ impl BlockDivisionState {
                 &selection_instance.participant,
                 &selection_instance.selection,
             );
-            selection_instance.selection.state = Some(result);
+
+            println!("Selection result: {:?}", result);
+            match self.selections.get_mut(&selection_instance.round) {
+                Some(selection_map) => match selection_map.get_mut(&selection_instance.participant)
+                {
+                    Some(selections) => {
+                        match selections.get_mut(selection_instance.selection_index) {
+                            Some(selection) => match selection {
+                                Some(selection) => {
+                                    selection.state = Some(result);
+                                }
+                                None => {
+                                    eprintln!("Malformed selection instance.");
+                                }
+                            },
+                            None => {
+                                eprintln!("Malformed selection instance.");
+                            }
+                        }
+                    }
+                    None => {
+                        eprintln!("Malformed selection instance.");
+                    }
+                },
+                None => {
+                    eprintln!("Malformed selection instance.");
+                }
+            }
         }
 
         //Caller must save state so selection results persist.

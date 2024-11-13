@@ -27,5 +27,5 @@ A few packages are necessary for the build. These are in `default.nix`. Either r
 Use the stack in `./deploy/prod` to deploy to the production server. Secrets here are excluded from the git repo for security.
 
 ## To Do
-- [ ] Right now if the admin doesn't refresh and submits an edit, the entire state is rewritten. This can undo selections. Need to make current round change piecemeal and do away with the "SetState," at least for editing; just have a create state.
-- [ ] Selection state isn't updating for the user on the frontend but instead stays null.
+- [x] Right now if the admin doesn't refresh and submits an edit, the entire state is rewritten. This can undo selections. Need to make current round change piecemeal and do away with the "SetState," at least for editing; just have a create state.
+- [x] Selection state isn't updating for the user on the frontend but instead stays null.

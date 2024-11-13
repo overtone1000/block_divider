@@ -4,7 +4,10 @@ import { defineConfig, type UserConfigExport } from 'vite';
 export default defineConfig(
 	({ command, mode, ssrBuild }) => {
 		const retval: UserConfigExport = {
-			plugins: [sveltekit()]
+			plugins: [sveltekit()],
+			server: {
+				open: "/admin", //automatically open the admin panel on server start
+			},
 		};
 
 		if (command === "serve") {

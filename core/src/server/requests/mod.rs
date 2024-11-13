@@ -23,4 +23,5 @@ pub(crate) enum BlockDivisionPost {
     DeleteState(DeleteStateRequest),
     SendStartEmail(UserView),
     SubmitSelections(SubmitSelections),
+    GetUserViewAsAdmin(UserView),
 }

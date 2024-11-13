@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Textfield from "@smui/textfield";
 
-	import SaveDiscard from "./save_discard_delete.svelte";
+	import SaveDiscard from "./exit_buttons.svelte";
 	import {
 		type BlockDivisionPost,
 		type BlockDivisionPostResult,

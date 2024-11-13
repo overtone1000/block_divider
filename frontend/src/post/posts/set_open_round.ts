@@ -1,6 +1,4 @@
-import type { BlockDivisionState } from "../results/block_division_state";
-
-export interface SetState {
+export interface SetOpenRound {
     id: string,
     round: number | null
 }

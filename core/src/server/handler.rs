@@ -31,7 +31,8 @@ use super::responses::BlockDivisionServerResponse;
 #[derive(Clone)]
 pub struct PostHandler {
     database_transaction_handler: Pool<ConnectionManager<PgConnection>>,
-    block_division_write_mutices: Arc<std::sync::Mutex<BTreeMap<String,Arc<std::sync::Mutex<()>>>>>
+    block_division_write_mutices: Arc<std::sync::Mutex<BTreeMap<String,Arc<std::sync::Mutex<()>>>>>,
+    enable_auth: bool
 }
 
 const BLOCK_DIVISION: &str = "/block_division_post";
@@ -60,12 +61,15 @@ impl StatefulHandler for PostHandler {
             Some(first)=>{
                 if first.starts_with(ADMIN) //catches any instance where admin.html is directly requested
                 {
-                    match check_basic_authentication(&parts, ADMIN, validator).await
+                    if self.enable_auth
                     {
-                        Handler::Continue=>println!("Authenticated."),
-                        Handler::ImmediateReturn(response) => {println!("Not authenticated."); return Ok(permit_all_cors(response));}
-                        Handler::Error(e)=>{return Err(e)}
-                    };
+                        match check_basic_authentication(&parts, ADMIN, validator).await
+                        {
+                            Handler::Continue=>println!("Authenticated."),
+                            Handler::ImmediateReturn(response) => {println!("Not authenticated."); return Ok(permit_all_cors(response));}
+                            Handler::Error(e)=>{return Err(e)}
+                        };
+                    }
                 }
             }
             None=>()
@@ -89,10 +93,11 @@ impl StatefulHandler for PostHandler {
 }
 
 impl PostHandler {
-    pub fn new(database_transaction_handler: Pool<ConnectionManager<PgConnection>>) -> PostHandler {
+    pub fn new(database_transaction_handler: Pool<ConnectionManager<PgConnection>>, enable_auth:bool) -> PostHandler {
         PostHandler {
             database_transaction_handler: database_transaction_handler,
             block_division_write_mutices: Arc::new(std::sync::Mutex::new(BTreeMap::new())),
+            enable_auth: enable_auth
         }
     }
 
@@ -174,16 +179,20 @@ impl PostHandler {
                         BlockDivisionPost::NewBasis(_) => Some(ADMIN),
                         BlockDivisionPost::DeleteState(_) => Some(ADMIN),
                         BlockDivisionPost::SendStartEmail(_) => Some(ADMIN),
+                        BlockDivisionPost::GetUserViewAsAdmin(_)=>Some(ADMIN)
                     };
 
                     match auth_realm {
                         Some(realm)=>{
-                            match check_basic_authentication(&parts, realm, validator).await
+                            if self.enable_auth
                             {
-                                Handler::Continue=>println!("Authenticated."),
-                                Handler::ImmediateReturn(response) => {println!("Not authenticated."); return Ok(permit_all_cors(response));}
-                                Handler::Error(e)=>{return Err(e)}
-                            };
+                                match check_basic_authentication(&parts, realm, validator).await
+                                {
+                                    Handler::Continue=>println!("Authenticated."),
+                                    Handler::ImmediateReturn(response) => {println!("Not authenticated."); return Ok(permit_all_cors(response));}
+                                    Handler::Error(e)=>{return Err(e)}
+                                };
+                            }
                         },
                         None=>()
                     }
@@ -353,6 +362,9 @@ impl PostHandler {
                             };
                             self.run_in_lock(&id, func)
                         },
+                        BlockDivisionPost::GetUserViewAsAdmin(user_view)=>{
+                            get_user_view(&mut conn,&user_view)
+                        }
                     }
                 }
                ,

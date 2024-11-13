@@ -4,29 +4,29 @@
 	import Select, { Option } from "@smui/select";
 	import { Icon } from "@smui/icon-button";
 	import Fab from "@smui/fab";
-	import Container from "./container.svelte";
+	import Container from "../container.svelte";
 	import { onMount } from "svelte";
-	import { handle_error } from "../commons/commons";
-	import { block_division_post } from "../post/block_division_post";
+	import { handle_error } from "../../commons/commons";
+	import { block_division_post } from "../../post/block_division_post";
 	import type {
 		BlockDivisionPost,
 		BlockDivisionPostResult,
 		ErrorResult,
 		UserViewResult
-	} from "../post/block_division_post";
+	} from "../../post/block_division_post";
 	import {
 		get_ancillary_designations,
 		get_designations,
 		get_sorted_rankings
-	} from "../commons/bucket_functions";
-	import type { BlockDivisionSelectionEntry } from "../post/results/block_division_state";
+	} from "../../commons/bucket_functions";
+	import type { BlockDivisionSelectionEntry } from "../../post/results/block_division_state";
 	import Switch from "@smui/switch";
 	import FormField from "@smui/form-field";
 	import Checkbox from "@smui/checkbox";
 	import Button from "@smui/button";
 
+	export let view: UserViewResult | undefined = undefined;
 	let message: string = "Loading";
-	let view: UserViewResult | undefined = undefined;
 	let urlhash: string | null = null;
 	let title: string = "Block Division";
 
@@ -58,19 +58,25 @@
 
 	let selections: BlockDivisionSelectionEntry[] = [];
 
-	let submit = () => {
-		if (view !== undefined) {
-			let post: BlockDivisionPost = {
-				SubmitSelections: {
-					user_id: view.user_id,
-					state_id: view.state_id,
-					selections: selections
-				}
-			};
+	let submit: undefined | (() => void) = undefined;
 
-			block_division_post(post, callback);
+	$: {
+		if (view !== undefined && view.user_id !== undefined) {
+			submit = () => {
+				let post: BlockDivisionPost = {
+					SubmitSelections: {
+						user_id: (view as UserViewResult).user_id as number,
+						state_id: (view as UserViewResult).state_id as string,
+						selections: selections
+					}
+				};
+
+				block_division_post(post, callback);
+			};
+		} else {
+			submit = undefined;
 		}
-	};
+	}
 
 	let bucket_id_keyfunc = (bucket_id: number) => {
 		if (view === undefined) {
@@ -83,22 +89,25 @@
 	$: {
 		console.debug("View:", view);
 		if (view !== undefined) {
-			title = view.state_id + " - " + view.state.basis.participant_definitions[view.user_id].name;
-			selections = [];
-			let current_open_round = view.state.current_open_round;
-			console.debug("Current open round:", current_open_round);
-			if (current_open_round !== null) {
-				let picks_allowed =
-					view.state.basis.participant_definitions[view.user_id].round_picks_allowed[
-						current_open_round
-					];
-				let current_selections = view.state.selections.state[current_open_round][view.user_id];
-				console.debug("Picks allowed:", picks_allowed);
-				console.debug("Current selections:", current_selections);
-				if (current_selections.length !== picks_allowed) {
-					console.error("Backend error. Picks allowed !== current selections array length.");
+			title = view.state_id;
+			if (view.user_id !== undefined) {
+				title = title + " - " + view.state.basis.participant_definitions[view.user_id].name;
+				selections = [];
+				let current_open_round = view.state.current_open_round;
+				console.debug("Current open round:", current_open_round);
+				if (current_open_round !== null) {
+					let picks_allowed =
+						view.state.basis.participant_definitions[view.user_id].round_picks_allowed[
+							current_open_round
+						];
+					let current_selections = view.state.selections.state[current_open_round][view.user_id];
+					console.debug("Picks allowed:", picks_allowed);
+					console.debug("Current selections:", current_selections);
+					if (current_selections.length !== picks_allowed) {
+						console.error("Backend error. Picks allowed !== current selections array length.");
+					}
+					selections = current_selections;
 				}
-				selections = current_selections;
 			}
 		} else {
 			selections = [];

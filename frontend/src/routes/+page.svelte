@@ -1,5 +1,5 @@
 <script>
-	import BlockDivision from "../components/main.svelte";
+	import BlockDivision from "../components/block_division/block_division_view.svelte";
 </script>
 
 <svelte:head>

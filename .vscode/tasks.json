@@ -22,7 +22,16 @@
             "detail": "vite dev"
         },
         {
-            "label": "Core - Run",
+            "label": "Core - Run Insecure",
+            "type": "shell",
+            "command": "cargo run -- --insecure",
+            "group": "build",
+            "options": {
+                "cwd": "${workspaceFolder}/core"
+            },
+        },
+        {
+            "label": "Core - Run Secure",
             "type": "shell",
             "command": "cargo run",
             "group": "build",

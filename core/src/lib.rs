@@ -24,7 +24,9 @@ const PORT: u16 = 8181;
 pub const MIGRATIONS: diesel_migrations::EmbeddedMigrations =
     diesel_migrations::embed_migrations!("./migrations");
 
-pub async fn tokio_serve<'a>() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+pub async fn tokio_serve<'a>(
+    enable_auth: bool,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("Starting database transaction handler");
     //let mut db_handler: AsyncDatabaseTransactionHandler<DatabaseTransaction, PgConnection> =
     //    AsyncDatabaseTransactionHandler::new(establish_connection);
@@ -51,7 +53,7 @@ pub async fn tokio_serve<'a>() -> Result<(), Box<dyn std::error::Error + Send + 
     };
 
     println!("Building server");
-    let service = PostHandler::new(db_handler);
+    let service = PostHandler::new(db_handler, enable_auth);
 
     loop {
         println!("Starting server.");
