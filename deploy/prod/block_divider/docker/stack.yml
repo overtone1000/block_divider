@@ -1,0 +1,53 @@
+services:
+
+  block_divider_core:
+    restart: always
+    image: docker.io/overtone1000/block_divider:prod
+    networks:
+      - internal_net
+    #volumes:
+    #- /etc/timezone:/etc/timezone:ro  #Set time zone to be the same as the host machine
+    #- /etc/localtime:/etc/localtime:ro #Set local time to be the same as the host machine
+    depends_on:
+      - postgres
+    environment:
+      EMAIL_FROM_ADDRESS: $EMAIL_FROM_ADDRESS
+      EMAIL_SMTP_URL: $EMAIL_SMTP_URL
+      EMAIL_SMTP_PORT: $EMAIL_SMTP_PORT
+      EMAIL_USER: $EMAIL_USER
+      EMAIL_PASSWORD: $EMAIL_PASSWORD
+      DATABASE_URL: "postgres://${DB_USER}:${DB_PASSWORD}@postgres/${DB_NAME}"
+      FILE_ROOT: "/var/www/block_divider"
+    logging:
+      driver: json-file
+      options:
+        max-size: 1m
+
+  postgres:
+    restart: always
+    image: docker.io/postgres:12
+    networks:
+      - internal_net
+    volumes:
+      - block_divider_db_volume:/var/lib/postgresql/data/ #need to do this directory or the container will mount a second volume
+      #- /etc/timezone:/etc/timezone:ro  #Set time zone to be the same as the host machine
+      #- /etc/localtime:/etc/localtime:ro #Set local time to be the same as the host machine
+    environment:
+      POSTGRES_USER: $DB_USER
+      POSTGRES_PASSWORD: $DB_PASSWORD
+      PGDATA: "/var/lib/postgresql/data/block_divider"
+      POSTGRES_DB: $DB_NAME
+    logging:
+      driver: json-file
+      options:
+        max-size: 1m  
+
+volumes:
+  block_divider_db_volume:
+    name: block_divider_db_volume
+
+networks:
+  internal_net:
+    name: internal_net
+    driver: bridge
+    external: true
