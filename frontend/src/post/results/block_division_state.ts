@@ -12,8 +12,9 @@ export interface BlockDivisionSelection {
 
 export type BlockDivisionSelectionEntry = BlockDivisionSelection | null;
 
-export function clone_block_division_selections(original: BlockDivisionSelection) {
+export function clone_block_division_selection(original: BlockDivisionSelection | null) {
 
+    if (original === null) { return null; }
     let bucket_index = original.bucket_index;
     let state = original.state;
     let ancillaries: AncillaryIndex[] = [...original.ancillaries];

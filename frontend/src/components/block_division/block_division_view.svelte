@@ -20,7 +20,7 @@
 		get_sorted_rankings
 	} from "../../commons/bucket_functions";
 	import {
-		clone_block_division_selections,
+		clone_block_division_selection,
 		type BlockDivisionSelectionEntry
 	} from "../../post/results/block_division_state";
 	import Switch from "@smui/switch";
@@ -40,7 +40,7 @@
 			title = view.state_id;
 			if (view.user_id !== undefined) {
 				title = title + " - " + view.state.basis.participant_definitions[view.user_id].name;
-				selections = [];
+
 				let current_open_round = view.state.current_open_round;
 				if (current_open_round !== null) {
 					let picks_allowed =
@@ -49,16 +49,20 @@
 						];
 
 					//Need to deep copy here
+					selections = [];
 					for (const current_selection of view.state.selections.state[current_open_round][
 						view.user_id
 					]) {
-						if (current_selection !== null) {
-							selections.push(clone_block_division_selections(current_selection));
-						}
+						selections.push(clone_block_division_selection(current_selection));
 					}
 
 					if (selections.length !== picks_allowed) {
-						console.error("Backend error. Picks allowed !== current selections array length.");
+						console.error(
+							"Backend error. Picks allowed !== current selections array length.",
+							current_open_round,
+							selections,
+							picks_allowed
+						);
 					}
 				}
 			}
@@ -269,7 +273,7 @@
 												let current =
 													view.state.selections.state[current_open_round][user_id][selection_index];
 												if (current !== null) {
-													selection = clone_block_division_selections(current);
+													selection = clone_block_division_selection(current);
 												}
 											} else {
 												selection = null;
