@@ -17,3 +17,6 @@ ssh -l $REMOTE_USER $REMOTE_IP "podman compose --env-file $TMP_FOLDER/.env -f $T
 ssh -l $REMOTE_USER $REMOTE_IP "podman container prune -f"
 ssh -l $REMOTE_USER $REMOTE_IP "podman compose --env-file $TMP_FOLDER/.env -f $TMP_FOLDER/stack.yml up --detach"
 ssh -l $REMOTE_USER $REMOTE_IP "rm -rdf $TMP_FOLDER"
+
+echo "Restarting nginx to repair network."
+ssh -l $REMOTE_USER $REMOTE_IP "podman restart stack_nginx_1"
